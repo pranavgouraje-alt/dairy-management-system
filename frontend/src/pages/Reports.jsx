@@ -1,5 +1,11 @@
+import MainLayout from "../layouts/MainLayout";
+
 function Reports() {
-  return <h1>Reports Page</h1>;
+  return (
+    <MainLayout>
+      <h1>Reports Page</h1>
+    </MainLayout>
+  );
 }
 
 export default Reports;

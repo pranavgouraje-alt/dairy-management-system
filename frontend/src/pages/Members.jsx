@@ -1,5 +1,11 @@
+import MainLayout from "../layouts/MainLayout";
+
 function Members() {
-  return <h1>Members Page</h1>;
+  return (
+    <MainLayout>
+      <h1>Members Page</h1>
+    </MainLayout>
+  );
 }
 
 export default Members;

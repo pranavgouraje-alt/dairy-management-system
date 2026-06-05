@@ -1,5 +1,13 @@
+import MainLayout from "../layouts/MainLayout";
+
 function Dashboard() {
-  return <h1>Dashboard Page</h1>;
+  return (
+    <MainLayout>
+      <h1>Dashboard</h1>
+
+      <p>Welcome to Dairy Management System</p>
+    </MainLayout>
+  );
 }
 
 export default Dashboard;
