@@ -3,6 +3,7 @@ import MainLayout from "../layouts/MainLayout";
 
 function Members() {
 
+  // Form State
   const [formData, setFormData] = useState({
     memberId: "",
     name: "",
@@ -11,10 +12,16 @@ function Members() {
     status: "Active"
   });
 
+  // Members List
   const [members, setMembers] = useState([]);
 
+  // Search Box State
   const [search, setSearch] = useState("");
 
+  // Track Editing Record
+  const [editIndex, setEditIndex] = useState(null);
+
+  // Handle Input Changes
   function handleChange(e) {
 
     setFormData({
@@ -24,8 +31,10 @@ function Members() {
 
   }
 
-  function addMember() {
+  // Add or Update Member
+  function saveMember() {
 
+    // Validation
     if (
       !formData.memberId ||
       !formData.name ||
@@ -35,11 +44,29 @@ function Members() {
       return;
     }
 
-    setMembers([
-      ...members,
-      formData
-    ]);
+    // Update Existing Member
+    if (editIndex !== null) {
 
+      const updatedMembers = [...members];
+
+      updatedMembers[editIndex] = formData;
+
+      setMembers(updatedMembers);
+
+      setEditIndex(null);
+
+    }
+    // Add New Member
+    else {
+
+      setMembers([
+        ...members,
+        formData
+      ]);
+
+    }
+
+    // Reset Form
     setFormData({
       memberId: "",
       name: "",
@@ -47,8 +74,19 @@ function Members() {
       village: "",
       status: "Active"
     });
+
   }
 
+  // Edit Member
+  function editMember(index) {
+
+    setFormData(members[index]);
+
+    setEditIndex(index);
+
+  }
+
+  // Delete Member
   function deleteMember(index) {
 
     const updatedMembers =
@@ -60,6 +98,7 @@ function Members() {
 
   }
 
+  // Search Filter
   const filteredMembers =
     members.filter((member) =>
       member.name
@@ -72,6 +111,7 @@ function Members() {
 
       <h1>Members Management</h1>
 
+      {/* Form Section */}
       <div className="member-form">
 
         <input
@@ -111,14 +151,19 @@ function Members() {
           <option>Inactive</option>
         </select>
 
-        <button onClick={addMember}>
-          Add Member
+        <button onClick={saveMember}>
+          {
+            editIndex !== null
+              ? "Update Member"
+              : "Add Member"
+          }
         </button>
 
       </div>
 
       <hr />
 
+      {/* Search Box */}
       <input
         className="search-box"
         placeholder="Search Member"
@@ -128,6 +173,7 @@ function Members() {
         }
       />
 
+      {/* Members Table */}
       <table className="member-table">
 
         <thead>
@@ -156,9 +202,29 @@ function Members() {
 
               <td>{member.village}</td>
 
-              <td>{member.status}</td>
+              <td>
+
+                <span
+                  className={
+                    member.status === "Active"
+                      ? "active-badge"
+                      : "inactive-badge"
+                  }
+                >
+                  {member.status}
+                </span>
+
+              </td>
 
               <td>
+
+                <button
+                  onClick={() =>
+                    editMember(index)
+                  }
+                >
+                  Edit
+                </button>
 
                 <button
                   onClick={() =>
