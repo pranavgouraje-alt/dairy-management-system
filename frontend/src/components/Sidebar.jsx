@@ -21,6 +21,9 @@ function Sidebar() {
         <li>
           <Link to="/reports">Reports</Link>
         </li>
+        <li>
+          <Link to="/ratemaster">RateMaster</Link>
+        </li>
       </ul>
     </div>
   );

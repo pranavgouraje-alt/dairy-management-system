@@ -17,6 +17,8 @@ function Collection() {
       .toISOString()
       .split("T")[0]
   };
+  const [rateMaster, setRateMaster] =
+    useState([]);
 
   const [collectionData, setCollectionData] =
     useState(emptyForm);
@@ -32,6 +34,23 @@ function Collection() {
 
   const [editIndex, setEditIndex] =
     useState(null);
+
+  useEffect(() => {
+
+    const savedRates =
+      localStorage.getItem(
+        "rateMaster"
+      );
+
+    if (savedRates) {
+
+      setRateMaster(
+        JSON.parse(savedRates)
+      );
+
+    }
+
+  }, []);
 
   // Load Members
   useEffect(() => {
@@ -83,26 +102,60 @@ function Collection() {
 
       ...collectionData,
 
-      [e.target.name]: e.target.value
+      [e.target.name]:
+        e.target.value
 
     };
 
-    if (
-      e.target.name === "quantity" ||
-      e.target.name === "rate"
-    ) {
+    const rate =
+      getRate(
 
-      const quantity =
-        Number(updatedData.quantity);
+        updatedData.milkType,
 
-      const rate =
-        Number(updatedData.rate);
+        updatedData.fat,
 
-      updatedData.amount =
-        quantity * rate;
-    }
+        updatedData.snf
 
-    setCollectionData(updatedData);
+      );
+
+    updatedData.rate =
+      rate;
+
+    updatedData.amount =
+
+      Number(
+        updatedData.quantity || 0
+      ) * rate;
+
+    setCollectionData(
+      updatedData
+    );
+
+  }
+
+  function getRate(
+    milkType,
+    fat,
+    snf
+  ) {
+
+    const rateRecord =
+      rateMaster.find(
+
+        (rate) =>
+
+          rate.milkType === milkType &&
+
+          rate.fat === fat &&
+
+          rate.snf === snf
+
+      );
+
+    return rateRecord
+      ? Number(rateRecord.rate)
+      : 0;
+
   }
 
   function findMember(memberId) {
@@ -128,8 +181,7 @@ function Collection() {
     if (
       !collectionData.memberId ||
       !collectionData.memberName ||
-      !collectionData.quantity ||
-      !collectionData.rate
+      !collectionData.quantity
     ) {
 
       alert(
@@ -137,9 +189,76 @@ function Collection() {
       );
 
       return;
+
+    }
+
+    if (
+      collectionData.rate === 0
+    ) {
+
+      alert(
+        "Rate not found"
+      );
+
+      return;
+
+    }
+    if (isDuplicateEntry()) {
+
+      alert(
+        "Collection already exists for this member, date, shift and milk type."
+      );
+      if (
+        Number(
+          collectionData.quantity
+        ) <= 0
+      ) {
+
+        alert(
+          "Quantity must be greater than zero"
+        );
+
+        return;
+
+      }
+
+      if (
+        Number(
+          collectionData.fat
+        ) <= 0
+      ) {
+
+        alert(
+          "Invalid fat value"
+        );
+
+        return;
+
+      }
+
+      if (
+        Number(
+          collectionData.snf
+        ) <= 0
+      ) {
+
+        alert(
+          "Invalid SNF value"
+        );
+
+        return;
+
+      }
+      return;
+
+
+
     }
 
     const record = {
+
+      collectionId:
+        Date.now(),
 
       ...collectionData,
 
@@ -148,6 +267,7 @@ function Collection() {
           .toLocaleTimeString()
 
     };
+
 
     if (editIndex !== null) {
 
@@ -205,6 +325,46 @@ function Collection() {
     );
 
   }
+
+
+
+  // VALIDATIONS 
+  function isDuplicateEntry() {
+
+    return collections.some(
+
+      (collection, index) => {
+
+        if (
+          editIndex !== null &&
+          index === editIndex
+        ) {
+          return false;
+        }
+
+        return (
+
+          collection.memberId ===
+          collectionData.memberId &&
+
+          collection.collectionDate ===
+          collectionData.collectionDate &&
+
+          collection.session ===
+          collectionData.session &&
+
+          collection.milkType ===
+          collectionData.milkType
+
+        );
+      }
+
+    );
+
+  }
+
+
+
 
   const filteredCollections =
     collections.filter(
@@ -295,10 +455,9 @@ function Collection() {
         />
 
         <input
-          name="rate"
-          placeholder="Rate"
           value={collectionData.rate}
-          onChange={handleChange}
+          readOnly
+          placeholder="Auto Rate"
         />
 
         <input
