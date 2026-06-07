@@ -1,33 +1,81 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 
 function Collection() {
 
+  const emptyForm = {
+    memberId: "",
+    memberName: "",
+    milkType: "Cow",
+    session: "Morning",
+    quantity: "",
+    fat: "",
+    snf: "",
+    rate: "",
+    amount: 0,
+    collectionDate: new Date()
+      .toISOString()
+      .split("T")[0]
+  };
+
   const [collectionData, setCollectionData] =
-    useState({
-
-      memberId: "",
-
-      memberName: "",
-
-      milkType: "Cow",
-
-      session: "Morning",
-
-      quantity: "",
-
-      fat: "",
-
-      snf: "",
-
-      rate: "",
-
-      amount: 0
-
-    });
+    useState(emptyForm);
 
   const [collections, setCollections] =
     useState([]);
+
+  const [members, setMembers] =
+    useState([]);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [editIndex, setEditIndex] =
+    useState(null);
+
+  // Load Members
+  useEffect(() => {
+
+    const savedMembers =
+      localStorage.getItem("members");
+
+    if (savedMembers) {
+
+      setMembers(
+        JSON.parse(savedMembers)
+      );
+
+    }
+
+  }, []);
+
+  // Load Collections
+  useEffect(() => {
+
+    const savedCollections =
+      localStorage.getItem(
+        "collections"
+      );
+
+    if (savedCollections) {
+
+      setCollections(
+        JSON.parse(savedCollections)
+      );
+
+    }
+
+  }, []);
+
+  // Save Collections
+  useEffect(() => {
+
+    localStorage.setItem(
+      "collections",
+      JSON.stringify(collections)
+    );
+
+  }, [collections]);
 
   function handleChange(e) {
 
@@ -45,22 +93,34 @@ function Collection() {
     ) {
 
       const quantity =
-        Number(
-          updatedData.quantity
-        );
+        Number(updatedData.quantity);
 
       const rate =
-        Number(
-          updatedData.rate
-        );
+        Number(updatedData.rate);
 
       updatedData.amount =
         quantity * rate;
     }
 
-    setCollectionData(
-      updatedData
+    setCollectionData(updatedData);
+  }
+
+  function findMember(memberId) {
+
+    const member = members.find(
+      (m) => m.memberId === memberId
     );
+
+    if (member) {
+
+      setCollectionData((prev) => ({
+        ...prev,
+        memberId,
+        memberName: member.name
+      }));
+
+    }
+
   }
 
   function saveCollection() {
@@ -79,34 +139,82 @@ function Collection() {
       return;
     }
 
-    setCollections([
-      ...collections,
-      collectionData
-    ]);
+    const record = {
+
+      ...collectionData,
+
+      collectionTime:
+        new Date()
+          .toLocaleTimeString()
+
+    };
+
+    if (editIndex !== null) {
+
+      const updatedCollections =
+        [...collections];
+
+      updatedCollections[
+        editIndex
+      ] = record;
+
+      setCollections(
+        updatedCollections
+      );
+
+      setEditIndex(null);
+
+    } else {
+
+      setCollections([
+        ...collections,
+        record
+      ]);
+
+    }
 
     setCollectionData({
-
-      memberId: "",
-
-      memberName: "",
-
-      milkType: "Cow",
-
-      session: "Morning",
-
-      quantity: "",
-
-      fat: "",
-
-      snf: "",
-
-      rate: "",
-
-      amount: 0
-
+      ...emptyForm,
+      collectionDate:
+        new Date()
+          .toISOString()
+          .split("T")[0]
     });
 
   }
+
+  function editCollection(index) {
+
+    setCollectionData(
+      collections[index]
+    );
+
+    setEditIndex(index);
+
+  }
+
+  function deleteCollection(index) {
+
+    const updatedCollections =
+      collections.filter(
+        (_, i) => i !== index
+      );
+
+    setCollections(
+      updatedCollections
+    );
+
+  }
+
+  const filteredCollections =
+    collections.filter(
+      (collection) =>
+        collection.memberName
+          .toLowerCase()
+          .includes(
+            search.toLowerCase()
+          )
+    );
 
   return (
 
@@ -122,7 +230,15 @@ function Collection() {
           name="memberId"
           placeholder="Member ID"
           value={collectionData.memberId}
-          onChange={handleChange}
+          onChange={(e) => {
+
+            handleChange(e);
+
+            findMember(
+              e.target.value
+            );
+
+          }}
         />
 
         <input
@@ -149,6 +265,13 @@ function Collection() {
           <option>Morning</option>
           <option>Evening</option>
         </select>
+
+        <input
+          type="date"
+          name="collectionDate"
+          value={collectionData.collectionDate}
+          onChange={handleChange}
+        />
 
         <input
           name="quantity"
@@ -187,38 +310,44 @@ function Collection() {
         <button
           onClick={saveCollection}
         >
-          Save Collection
+          {editIndex !== null
+            ? "Update Collection"
+            : "Save Collection"}
         </button>
 
       </div>
 
       <hr />
 
-      <table
-        className="member-table"
-      >
+      <input
+        className="search-box"
+        placeholder="Search Member"
+        value={search}
+        onChange={(e) =>
+          setSearch(
+            e.target.value
+          )
+        }
+      />
+
+      <table className="member-table">
 
         <thead>
 
           <tr>
 
-            <th>Member</th>
-
+            <th>ID</th>
             <th>Name</th>
-
+            <th>Date</th>
+            <th>Time</th>
             <th>Type</th>
-
             <th>Session</th>
-
             <th>Qty</th>
-
             <th>Fat</th>
-
             <th>SNF</th>
-
             <th>Rate</th>
-
             <th>Amount</th>
+            <th>Action</th>
 
           </tr>
 
@@ -226,7 +355,7 @@ function Collection() {
 
         <tbody>
 
-          {collections.map(
+          {filteredCollections.map(
             (
               collection,
               index
@@ -240,6 +369,14 @@ function Collection() {
 
                 <td>
                   {collection.memberName}
+                </td>
+
+                <td>
+                  {collection.collectionDate}
+                </td>
+
+                <td>
+                  {collection.collectionTime}
                 </td>
 
                 <td>
@@ -267,8 +404,27 @@ function Collection() {
                 </td>
 
                 <td>
-                  ₹
-                  {collection.amount}
+                  ₹{collection.amount}
+                </td>
+
+                <td>
+
+                  <button
+                    onClick={() =>
+                      editCollection(index)
+                    }
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      deleteCollection(index)
+                    }
+                  >
+                    Delete
+                  </button>
+
                 </td>
 
               </tr>
