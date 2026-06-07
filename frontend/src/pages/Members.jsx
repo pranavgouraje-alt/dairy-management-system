@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 
 function Members() {
 
-  // Form State
   const [formData, setFormData] = useState({
     memberId: "",
     name: "",
@@ -12,16 +11,38 @@ function Members() {
     status: "Active"
   });
 
-  // Members List
   const [members, setMembers] = useState([]);
 
-  // Search Box State
   const [search, setSearch] = useState("");
 
-  // Track Editing Record
   const [editIndex, setEditIndex] = useState(null);
 
-  // Handle Input Changes
+  // Load members from Local Storage when page loads
+  useEffect(() => {
+
+    const savedMembers =
+      localStorage.getItem("members");
+
+    if (savedMembers) {
+
+      setMembers(
+        JSON.parse(savedMembers)
+      );
+
+    }
+
+  }, []);
+
+  // Save members whenever members array changes
+  useEffect(() => {
+
+    localStorage.setItem(
+      "members",
+      JSON.stringify(members)
+    );
+
+  }, [members]);
+
   function handleChange(e) {
 
     setFormData({
@@ -31,31 +52,66 @@ function Members() {
 
   }
 
-  // Add or Update Member
   function saveMember() {
 
-    // Validation
+    // Required Field Validation
     if (
       !formData.memberId ||
       !formData.name ||
       !formData.mobile
     ) {
-      alert("Please fill required fields");
+
+      alert("Please fill all required fields");
+
       return;
     }
 
-    // Update Existing Member
+    // Mobile Validation
+    if (formData.mobile.length !== 10) {
+
+      alert(
+        "Mobile number must be 10 digits"
+      );
+
+      return;
+    }
+
+    // Duplicate Check (only while adding)
+    if (editIndex === null) {
+
+      const duplicateMember =
+        members.find(
+          (member) =>
+            member.memberId ===
+            formData.memberId
+        );
+
+      if (duplicateMember) {
+
+        alert(
+          "Member ID already exists"
+        );
+
+        return;
+      }
+
+    }
+
+    // Edit Existing Member
     if (editIndex !== null) {
 
-      const updatedMembers = [...members];
+      const updatedMembers =
+        [...members];
 
-      updatedMembers[editIndex] = formData;
+      updatedMembers[editIndex] =
+        formData;
 
       setMembers(updatedMembers);
 
       setEditIndex(null);
 
     }
+
     // Add New Member
     else {
 
@@ -77,16 +133,16 @@ function Members() {
 
   }
 
-  // Edit Member
   function editMember(index) {
 
-    setFormData(members[index]);
+    setFormData(
+      members[index]
+    );
 
     setEditIndex(index);
 
   }
 
-  // Delete Member
   function deleteMember(index) {
 
     const updatedMembers =
@@ -98,20 +154,22 @@ function Members() {
 
   }
 
-  // Search Filter
   const filteredMembers =
     members.filter((member) =>
       member.name
         .toLowerCase()
-        .includes(search.toLowerCase())
+        .includes(
+          search.toLowerCase()
+        )
     );
 
   return (
     <MainLayout>
 
-      <h1>Members Management</h1>
+      <h1>
+        Members Management
+      </h1>
 
-      {/* Form Section */}
       <div className="member-form">
 
         <input
@@ -152,18 +210,19 @@ function Members() {
         </select>
 
         <button onClick={saveMember}>
+
           {
             editIndex !== null
               ? "Update Member"
               : "Add Member"
           }
+
         </button>
 
       </div>
 
       <hr />
 
-      {/* Search Box */}
       <input
         className="search-box"
         placeholder="Search Member"
@@ -173,18 +232,26 @@ function Members() {
         }
       />
 
-      {/* Members Table */}
       <table className="member-table">
 
         <thead>
+
           <tr>
+
             <th>ID</th>
+
             <th>Name</th>
+
             <th>Mobile</th>
+
             <th>Village</th>
+
             <th>Status</th>
+
             <th>Action</th>
+
           </tr>
+
         </thead>
 
         <tbody>
@@ -192,53 +259,67 @@ function Members() {
           {filteredMembers.map(
             (member, index) => (
 
-            <tr key={index}>
+              <tr
+                key={
+                  member.memberId
+                }
+              >
 
-              <td>{member.memberId}</td>
+                <td>
+                  {member.memberId}
+                </td>
 
-              <td>{member.name}</td>
+                <td>
+                  {member.name}
+                </td>
 
-              <td>{member.mobile}</td>
+                <td>
+                  {member.mobile}
+                </td>
 
-              <td>{member.village}</td>
+                <td>
+                  {member.village}
+                </td>
 
-              <td>
+                <td>
 
-                <span
-                  className={
-                    member.status === "Active"
-                      ? "active-badge"
-                      : "inactive-badge"
-                  }
-                >
-                  {member.status}
-                </span>
+                  <span
+                    className={
+                      member.status ===
+                      "Active"
+                        ? "active-badge"
+                        : "inactive-badge"
+                    }
+                  >
+                    {member.status}
+                  </span>
 
-              </td>
+                </td>
 
-              <td>
+                <td>
 
-                <button
-                  onClick={() =>
-                    editMember(index)
-                  }
-                >
-                  Edit
-                </button>
+                  <button
+                    onClick={() =>
+                      editMember(index)
+                    }
+                  >
+                    Edit
+                  </button>
 
-                <button
-                  onClick={() =>
-                    deleteMember(index)
-                  }
-                >
-                  Delete
-                </button>
+                  <button
+                    onClick={() =>
+                      deleteMember(index)
+                    }
+                  >
+                    Delete
+                  </button>
 
-              </td>
+                </td>
 
-            </tr>
+              </tr>
 
-          ))}
+            )
+          )}
 
         </tbody>
 
