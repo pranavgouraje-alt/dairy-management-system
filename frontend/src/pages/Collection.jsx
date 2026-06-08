@@ -35,6 +35,33 @@ function Collection() {
   const [editIndex, setEditIndex] =
     useState(null);
 
+ /* const [selectedDate, setSelectedDate] =
+    useState(
+      new Date()
+        .toISOString()
+        .split("T")[0]
+    );
+
+  const [selectedSession, setSelectedSession] =
+    useState("Morning");*/
+
+  const filteredCollections =
+    collections.filter(
+      (collection) =>
+
+        collection.collectionDate ===
+        collectionData.collectionDate &&
+
+        collection.session ===
+        collectionData.session &&
+
+        collection.memberName
+          .toLowerCase()
+          .includes(
+            search.toLowerCase()
+          )
+    );
+
   useEffect(() => {
 
     const savedRates =
@@ -366,16 +393,6 @@ function Collection() {
 
 
 
-  const filteredCollections =
-    collections.filter(
-      (collection) =>
-        collection.memberName
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
-    );
-
   return (
 
     <MainLayout>
@@ -475,6 +492,7 @@ function Collection() {
         </button>
 
       </div>
+      <hr />
 
       <hr />
 
