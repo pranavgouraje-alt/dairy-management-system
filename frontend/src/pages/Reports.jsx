@@ -83,6 +83,19 @@ function Reports() {
               Member-wise payable milk amount
             </p>
           </div>
+
+        </Link>
+
+        <Link
+          to="/member-bill"
+          className="report-link"
+        >
+          <div className="report-card">
+            <h3>🧾 Member Bill</h3>
+            <p>
+              Generate member-wise milk bill
+            </p>
+          </div>
         </Link>
 
       </div>

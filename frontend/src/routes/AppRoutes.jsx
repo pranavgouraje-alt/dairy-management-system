@@ -10,6 +10,7 @@ import CollectionRegister from "../pages/CollectionRegister";
 import MilkSummary from "../pages/MilkSummary";
 import FatSNFReport from "../pages/FatSNFReport";
 import PaymentRegister from "../pages/PaymentRegister";
+import MemberBill from "../pages/MemberBill";
 
 function AppRoutes() {
   return (
@@ -24,6 +25,7 @@ function AppRoutes() {
       <Route path="/milk-summary" element={<MilkSummary />} />
       <Route path="/fat-snf-report" element={<FatSNFReport />} />
       <Route path="/payment-register" element={<PaymentRegister />} />
+      <Route path="/member-bill" element={<MemberBill />}/>
 
      
     </Routes>
