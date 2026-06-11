@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 
 function Collection() {
-
   const emptyForm = {
     memberId: "",
     memberName: "",
@@ -13,408 +12,247 @@ function Collection() {
     snf: "",
     rate: "",
     amount: 0,
-    collectionDate: new Date()
-      .toISOString()
-      .split("T")[0]
+    collectionDate: new Date().toISOString().split("T")[0],
   };
-  const [rateMaster, setRateMaster] =
-    useState([]);
 
-  const [collectionData, setCollectionData] =
-    useState(emptyForm);
-
-  const [collections, setCollections] =
-    useState([]);
-
-  const [members, setMembers] =
-    useState([]);
-
-  const [search, setSearch] =
-    useState("");
-
-  const [editIndex, setEditIndex] =
-    useState(null);
-
- /* const [selectedDate, setSelectedDate] =
-    useState(
-      new Date()
-        .toISOString()
-        .split("T")[0]
-    );
-
-  const [selectedSession, setSelectedSession] =
-    useState("Morning");*/
-
-  const filteredCollections =
-    collections.filter(
-      (collection) =>
-
-        collection.collectionDate ===
-        collectionData.collectionDate &&
-
-        collection.session ===
-        collectionData.session &&
-
-        collection.memberName
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
-    );
+  const [rateMaster, setRateMaster] = useState([]);
+  const [collectionData, setCollectionData] = useState(emptyForm);
+  const [collections, setCollections] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   useEffect(() => {
-
-    const savedRates =
-      localStorage.getItem(
-        "rateMaster"
-      );
+    const savedRates = localStorage.getItem("rateMaster");
 
     if (savedRates) {
-
-      setRateMaster(
-        JSON.parse(savedRates)
-      );
-
+      setRateMaster(JSON.parse(savedRates));
     }
-
   }, []);
 
-  // Load Members
   useEffect(() => {
-
-    const savedMembers =
-      localStorage.getItem("members");
+    const savedMembers = localStorage.getItem("members");
 
     if (savedMembers) {
-
-      setMembers(
-        JSON.parse(savedMembers)
-      );
-
+      setMembers(JSON.parse(savedMembers));
     }
-
   }, []);
 
-  // Load Collections
   useEffect(() => {
-
-    const savedCollections =
-      localStorage.getItem(
-        "collections"
-      );
+    const savedCollections = localStorage.getItem("collections");
 
     if (savedCollections) {
-
-      setCollections(
-        JSON.parse(savedCollections)
-      );
-
+      setCollections(JSON.parse(savedCollections));
     }
-
   }, []);
 
-  // Save Collections
   useEffect(() => {
-
-    localStorage.setItem(
-      "collections",
-      JSON.stringify(collections)
-    );
-
+    localStorage.setItem("collections", JSON.stringify(collections));
   }, [collections]);
 
-  function handleChange(e) {
+  const filteredCollections = collections.filter(
+    (collection) =>
+      collection.collectionDate === collectionData.collectionDate &&
+      collection.session === collectionData.session &&
+      collection.memberName.toLowerCase().includes(search.toLowerCase())
+  );
 
-    const updatedData = {
+  const sessionTotalMilk = filteredCollections.reduce(
+    (total, collection) => total + Number(collection.quantity),
+    0
+  );
 
-      ...collectionData,
+  const sessionTotalAmount = filteredCollections.reduce(
+    (total, collection) => total + Number(collection.amount),
+    0
+  );
 
-      [e.target.name]:
-        e.target.value
+  const sessionCowMilk = filteredCollections
+    .filter((collection) => collection.milkType === "Cow")
+    .reduce((total, collection) => total + Number(collection.quantity), 0);
 
-    };
+  const sessionCowAmount = filteredCollections
+    .filter((collection) => collection.milkType === "Cow")
+    .reduce((total, collection) => total + Number(collection.amount), 0);
 
-    const rate =
-      getRate(
+  const sessionBuffaloMilk = filteredCollections
+    .filter((collection) => collection.milkType === "Buffalo")
+    .reduce((total, collection) => total + Number(collection.quantity), 0);
 
-        updatedData.milkType,
+  const sessionBuffaloAmount = filteredCollections
+    .filter((collection) => collection.milkType === "Buffalo")
+    .reduce((total, collection) => total + Number(collection.amount), 0);
 
-        updatedData.fat,
+  const activeMembers = members.filter((member) => member.status !== "Inactive");
 
-        updatedData.snf
+  const collectedMemberIds = filteredCollections.map(
+    (collection) => collection.memberId
+  );
 
-      );
+  const uniqueCollectedMemberIds = [...new Set(collectedMemberIds)];
 
-    updatedData.rate =
-      rate;
+  const completedCount = uniqueCollectedMemberIds.length;
 
-    updatedData.amount =
+  const pendingMembers = activeMembers.filter(
+    (member) => !uniqueCollectedMemberIds.includes(member.memberId)
+  );
 
-      Number(
-        updatedData.quantity || 0
-      ) * rate;
+  const pendingCount = pendingMembers.length;
 
-    setCollectionData(
-      updatedData
+  function getRate(milkType, fat, snf) {
+    const rateRecord = rateMaster.find(
+      (rate) =>
+        rate.milkType === milkType &&
+        rate.fat === fat &&
+        rate.snf === snf
     );
 
+    return rateRecord ? Number(rateRecord.rate) : 0;
   }
 
-  function getRate(
-    milkType,
-    fat,
-    snf
-  ) {
+  function handleChange(e) {
+    const updatedData = {
+      ...collectionData,
+      [e.target.name]: e.target.value,
+    };
 
-    const rateRecord =
-      rateMaster.find(
+    const rate = getRate(
+      updatedData.milkType,
+      updatedData.fat,
+      updatedData.snf
+    );
 
-        (rate) =>
+    updatedData.rate = rate;
+    updatedData.amount = Number(updatedData.quantity || 0) * rate;
 
-          rate.milkType === milkType &&
-
-          rate.fat === fat &&
-
-          rate.snf === snf
-
-      );
-
-    return rateRecord
-      ? Number(rateRecord.rate)
-      : 0;
-
+    setCollectionData(updatedData);
   }
 
   function findMember(memberId) {
-
-    const member = members.find(
-      (m) => m.memberId === memberId
-    );
+    const member = members.find((m) => m.memberId === memberId);
 
     if (member) {
-
       setCollectionData((prev) => ({
         ...prev,
         memberId,
-        memberName: member.name
+        memberName: member.name,
       }));
-
     }
+  }
 
+  function isDuplicateEntry() {
+    return collections.some((collection) => {
+      if (editId !== null && collection.collectionId === editId) {
+        return false;
+      }
+
+      return (
+        collection.memberId === collectionData.memberId &&
+        collection.collectionDate === collectionData.collectionDate &&
+        collection.session === collectionData.session &&
+        collection.milkType === collectionData.milkType
+      );
+    });
   }
 
   function saveCollection() {
-
     if (
       !collectionData.memberId ||
       !collectionData.memberName ||
-      !collectionData.quantity
+      !collectionData.quantity ||
+      !collectionData.fat ||
+      !collectionData.snf
     ) {
-
-      alert(
-        "Please fill required fields"
-      );
-
+      alert("Please fill required fields");
       return;
-
     }
 
-    if (
-      collectionData.rate === 0
-    ) {
-
-      alert(
-        "Rate not found"
-      );
-
+    if (Number(collectionData.quantity) <= 0) {
+      alert("Quantity must be greater than zero");
       return;
-
     }
+
+    if (Number(collectionData.fat) <= 0) {
+      alert("Invalid fat value");
+      return;
+    }
+
+    if (Number(collectionData.snf) <= 0) {
+      alert("Invalid SNF value");
+      return;
+    }
+
+    if (collectionData.rate === 0) {
+      alert("Rate not found");
+      return;
+    }
+
     if (isDuplicateEntry()) {
-
       alert(
-        "Collection already exists for this member, date, shift and milk type."
+        "Collection already exists for this member, date, shift and milk type. Please use Edit."
       );
-      if (
-        Number(
-          collectionData.quantity
-        ) <= 0
-      ) {
-
-        alert(
-          "Quantity must be greater than zero"
-        );
-
-        return;
-
-      }
-
-      if (
-        Number(
-          collectionData.fat
-        ) <= 0
-      ) {
-
-        alert(
-          "Invalid fat value"
-        );
-
-        return;
-
-      }
-
-      if (
-        Number(
-          collectionData.snf
-        ) <= 0
-      ) {
-
-        alert(
-          "Invalid SNF value"
-        );
-
-        return;
-
-      }
       return;
-
-
-
     }
 
     const record = {
-
-      collectionId:
-        Date.now(),
-
       ...collectionData,
-
+      collectionId: editId ?? Date.now(),
       collectionTime:
-        new Date()
-          .toLocaleTimeString()
-
+        editId !== null
+          ? collectionData.collectionTime || new Date().toLocaleTimeString()
+          : new Date().toLocaleTimeString(),
+      updatedTime: editId !== null ? new Date().toLocaleTimeString() : "",
     };
 
-
-    if (editIndex !== null) {
-
-      const updatedCollections =
-        [...collections];
-
-      updatedCollections[
-        editIndex
-      ] = record;
-
-      setCollections(
-        updatedCollections
+    if (editId !== null) {
+      const updatedCollections = collections.map((collection) =>
+        collection.collectionId === editId ? record : collection
       );
 
-      setEditIndex(null);
-
+      setCollections(updatedCollections);
+      setEditId(null);
     } else {
-
-      setCollections([
-        ...collections,
-        record
-      ]);
-
+      setCollections([...collections, record]);
     }
 
     setCollectionData({
       ...emptyForm,
-      collectionDate:
-        new Date()
-          .toISOString()
-          .split("T")[0]
+      collectionDate: new Date().toISOString().split("T")[0],
     });
-
   }
 
-  function editCollection(index) {
-
-    setCollectionData(
-      collections[index]
+  function editCollection(collectionId) {
+    const selectedCollection = collections.find(
+      (collection) => collection.collectionId === collectionId
     );
 
-    setEditIndex(index);
-
+    if (selectedCollection) {
+      setCollectionData(selectedCollection);
+      setEditId(collectionId);
+    }
   }
 
-  function deleteCollection(index) {
-
-    const updatedCollections =
-      collections.filter(
-        (_, i) => i !== index
-      );
-
-    setCollections(
-      updatedCollections
+  function deleteCollection(collectionId) {
+    const updatedCollections = collections.filter(
+      (collection) => collection.collectionId !== collectionId
     );
 
+    setCollections(updatedCollections);
   }
-
-
-
-  // VALIDATIONS 
-  function isDuplicateEntry() {
-
-    return collections.some(
-
-      (collection, index) => {
-
-        if (
-          editIndex !== null &&
-          index === editIndex
-        ) {
-          return false;
-        }
-
-        return (
-
-          collection.memberId ===
-          collectionData.memberId &&
-
-          collection.collectionDate ===
-          collectionData.collectionDate &&
-
-          collection.session ===
-          collectionData.session &&
-
-          collection.milkType ===
-          collectionData.milkType
-
-        );
-      }
-
-    );
-
-  }
-
-
-
 
   return (
-
     <MainLayout>
-
-      <h1>
-        Milk Collection
-      </h1>
+      <h1>Milk Collection</h1>
 
       <div className="collection-form">
-
         <input
           name="memberId"
           placeholder="Member ID"
           value={collectionData.memberId}
           onChange={(e) => {
-
             handleChange(e);
-
-            findMember(
-              e.target.value
-            );
-
+            findMember(e.target.value);
           }}
         />
 
@@ -471,28 +309,74 @@ function Collection() {
           onChange={handleChange}
         />
 
-        <input
-          value={collectionData.rate}
-          readOnly
-          placeholder="Auto Rate"
-        />
+        <input value={collectionData.rate} readOnly placeholder="Auto Rate" />
 
-        <input
-          value={collectionData.amount}
-          readOnly
-          placeholder="Amount"
-        />
+        <input value={collectionData.amount} readOnly placeholder="Amount" />
 
-        <button
-          onClick={saveCollection}
-        >
-          {editIndex !== null
-            ? "Update Collection"
-            : "Save Collection"}
+        <button onClick={saveCollection}>
+          {editId !== null ? "Update Collection" : "Save Collection"}
         </button>
-
       </div>
-      <hr />
+
+      <div className="session-summary-grid">
+        <div className="session-summary-card">
+          <h3>🐃 Buffalo Milk</h3>
+          <h2>{sessionBuffaloMilk} L</h2>
+          <p>₹{sessionBuffaloAmount}</p>
+        </div>
+
+        <div className="session-summary-card">
+          <h3>🐄 Cow Milk</h3>
+          <h2>{sessionCowMilk} L</h2>
+          <p>₹{sessionCowAmount}</p>
+        </div>
+
+        <div className="session-summary-card">
+          <h3>🥛 Total Milk</h3>
+          <h2>{sessionTotalMilk} L</h2>
+          <p>₹{sessionTotalAmount}</p>
+        </div>
+      </div>
+
+      <div className="collection-summary-row">
+        <div className="collection-mini-card">
+          <h3>पूर्ण संकलन</h3>
+          <h2>{completedCount}</h2>
+        </div>
+
+        <div
+          className="collection-mini-card pending-card"
+          onClick={() => setShowPendingModal(true)}
+        >
+          <h3>पेंडिंग संकलन</h3>
+          <h2>{pendingCount}</h2>
+        </div>
+      </div>
+
+      {showPendingModal && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <div className="modal-header">
+              <h2>Pending Members</h2>
+
+              <button onClick={() => setShowPendingModal(false)}>X</button>
+            </div>
+
+            {pendingMembers.length === 0 ? (
+              <p>All members completed collection.</p>
+            ) : (
+              <ul className="pending-list">
+                {pendingMembers.map((member) => (
+                  <li key={member.memberId}>
+                    <strong>{member.memberId}</strong> - {member.name}
+                    {member.village ? ` (${member.village})` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       <hr />
 
@@ -500,19 +384,91 @@ function Collection() {
         className="search-box"
         placeholder="Search Member"
         value={search}
-        onChange={(e) =>
-          setSearch(
-            e.target.value
-          )
-        }
+        onChange={(e) => setSearch(e.target.value)}
       />
 
+      <div className="collection-card-grid compact-card-grid">
+        {filteredCollections.length === 0 ? (
+          <div className="empty-collection-box">
+            No collection entries for selected date and session.
+          </div>
+        ) : (
+          filteredCollections.map((collection) => (
+            <div
+              className="compact-entry-card"
+              key={collection.collectionId}
+            >
+              <div className="compact-member">
+                <div className="member-info">
+                  <span className="member-animal-face">
+                    {collection.milkType === "Cow" ? "🐮" : "🐃"}
+                  </span>
+
+                  <div>
+                    <strong>
+                      {collection.memberId} - {collection.memberName}
+                    </strong>
+
+                    <span>{collection.collectionTime}</span>
+                  </div>
+                </div>
+              </div>
+
+              <span
+                className={
+                  collection.milkType === "Cow"
+                    ? "milk-type-badge cow-badge"
+                    : "milk-type-badge buffalo-badge"
+                }
+              >
+                {collection.milkType}
+              </span>
+
+              <div className="compact-data">
+                <span>Lit</span>
+                <strong>{collection.quantity}</strong>
+              </div>
+
+              <div className="compact-data">
+                <span>Fat</span>
+                <strong>{collection.fat}</strong>
+              </div>
+
+              <div className="compact-data">
+                <span>SNF</span>
+                <strong>{collection.snf}</strong>
+              </div>
+
+              <div className="compact-data">
+                <span>Rate</span>
+                <strong>₹{collection.rate}</strong>
+              </div>
+
+              <h2 className="compact-amount">₹{collection.amount}</h2>
+
+              <div className="compact-actions">
+                <button
+                  className="edit-btn"
+                  onClick={() => editCollection(collection.collectionId)}
+                >
+                  Edit
+                </button>
+
+                <button
+                  className="delete-btn"
+                  onClick={() => deleteCollection(collection.collectionId)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       <table className="member-table">
-
         <thead>
-
           <tr>
-
             <th>ID</th>
             <th>Name</th>
             <th>Date</th>
@@ -525,98 +481,39 @@ function Collection() {
             <th>Rate</th>
             <th>Amount</th>
             <th>Action</th>
-
           </tr>
-
         </thead>
 
         <tbody>
+          {filteredCollections.map((collection) => (
+            <tr key={collection.collectionId}>
+              <td>{collection.memberId}</td>
+              <td>{collection.memberName}</td>
+              <td>{collection.collectionDate}</td>
+              <td>{collection.collectionTime}</td>
+              <td>{collection.milkType}</td>
+              <td>{collection.session}</td>
+              <td>{collection.quantity}</td>
+              <td>{collection.fat}</td>
+              <td>{collection.snf}</td>
+              <td>{collection.rate}</td>
+              <td>₹{collection.amount}</td>
 
-          {filteredCollections.map(
-            (
-              collection,
-              index
-            ) => (
+              <td>
+                <button onClick={() => editCollection(collection.collectionId)}>
+                  Edit
+                </button>
 
-              <tr key={index}>
-
-                <td>
-                  {collection.memberId}
-                </td>
-
-                <td>
-                  {collection.memberName}
-                </td>
-
-                <td>
-                  {collection.collectionDate}
-                </td>
-
-                <td>
-                  {collection.collectionTime}
-                </td>
-
-                <td>
-                  {collection.milkType}
-                </td>
-
-                <td>
-                  {collection.session}
-                </td>
-
-                <td>
-                  {collection.quantity}
-                </td>
-
-                <td>
-                  {collection.fat}
-                </td>
-
-                <td>
-                  {collection.snf}
-                </td>
-
-                <td>
-                  {collection.rate}
-                </td>
-
-                <td>
-                  ₹{collection.amount}
-                </td>
-
-                <td>
-
-                  <button
-                    onClick={() =>
-                      editCollection(index)
-                    }
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      deleteCollection(index)
-                    }
-                  >
-                    Delete
-                  </button>
-
-                </td>
-
-              </tr>
-
-            )
-          )}
-
+                <button onClick={() => deleteCollection(collection.collectionId)}>
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
         </tbody>
-
       </table>
-
     </MainLayout>
-
   );
-
 }
 
 export default Collection;

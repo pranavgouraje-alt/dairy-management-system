@@ -73,6 +73,18 @@ function Reports() {
           </div>
         </Link>
 
+        <Link
+          to="/payment-register"
+          className="report-link"
+        >
+          <div className="report-card">
+            <h3>💵 Payment Register</h3>
+            <p>
+              Member-wise payable milk amount
+            </p>
+          </div>
+        </Link>
+
       </div>
 
     </MainLayout>
