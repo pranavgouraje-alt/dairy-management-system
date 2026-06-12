@@ -714,49 +714,94 @@ body {
   margin-bottom: 10px;
 }
 
-.bill-summary {
-  margin-top: 20px;
-  background: #f8fafc;
-  padding: 20px;
-  border-radius: 12px;
-  font-size: 18px;
-}
-
-.bill-summary p {
-  margin: 8px 0;
-}
-.bill-session-container {
-
+.bill-parallel-layout {
   display: grid;
-
-  grid-template-columns:
-  1fr 1fr;
-
-  gap: 20px;
-
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
   margin-top: 20px;
+}
 
+.bill-animal-section {
+  background: #f8fafc;
+  padding: 18px;
+  border-radius: 15px;
+  border: 1px solid #e5e7eb;
+}
+
+.bill-animal-section h2 {
+  text-align: center;
+  color: #1976d2;
+  margin-bottom: 15px;
+}
+
+.bill-session-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .bill-session-box {
-
   background: white;
-
-  padding: 20px;
-
-  border-radius: 15px;
-
-  box-shadow:
-  0 4px 15px rgba(0,0,0,0.08);
-
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
 .bill-session-box h3 {
-
   text-align: center;
+  color: #333;
+  margin-bottom: 10px;
+}
 
-  margin-bottom: 15px;
+.bill-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
 
-  color: #1976d2;
+.bill-mini-table th,
+.bill-mini-table td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: center;
+}
 
+.bill-mini-table th {
+  background: #1976d2;
+  color: white;
+}
+
+.animal-total {
+  margin-top: 15px;
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.animal-total p {
+  margin: 6px 0;
+}
+
+.bill-final-summary {
+  margin-top: 25px;
+  background: #e8f5e9;
+  padding: 20px;
+  border-radius: 15px;
+  text-align: center;
+}
+
+.bill-final-summary h2 {
+  margin: 8px 0;
+  color: #2e7d32;
+}
+
+@media (max-width: 1100px) {
+  .bill-parallel-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bill-session-container {
+    grid-template-columns: 1fr;
+  }
 }
