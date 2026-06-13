@@ -24,6 +24,13 @@ function Sidebar() {
         <li>
           <Link to="/ratemaster">RateMaster</Link>
         </li>
+
+         <li>
+          <Link to="/advance-management">AdvanceManagement</Link>
+        </li>
+         <li>
+          <Link to="/feed-Management">FeedManagement</Link>
+        </li>
       </ul>
     </div>
   );

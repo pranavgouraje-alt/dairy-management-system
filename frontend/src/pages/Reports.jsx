@@ -37,17 +37,6 @@ function Reports() {
           </div>
         </Link>
 
-        <Link
-          to="/member-ledger"
-          className="report-link"
-        >
-          <div className="report-card">
-            <h3>👤 Member Ledger</h3>
-            <p>
-              Member wise milk statement
-            </p>
-          </div>
-        </Link>
 
         <Link
           to="/milk-summary"
@@ -94,6 +83,18 @@ function Reports() {
             <h3>🧾 Member Bill</h3>
             <p>
               Generate member-wise milk bill
+            </p>
+          </div>
+        </Link>
+
+        <Link
+          to="/feed-advance-report"
+          className="report-link"
+        >
+          <div className="report-card">
+            <h3>📑 Feed & Advance Report</h3>
+            <p>
+              View member-wise feed and advance details
             </p>
           </div>
         </Link>
