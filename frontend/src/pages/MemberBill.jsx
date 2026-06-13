@@ -4,6 +4,8 @@ import MainLayout from "../layouts/MainLayout";
 function MemberBill() {
   const [members, setMembers] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [feedRecords, setFeedRecords] = useState([]);
+  const [advanceRecords, setAdvanceRecords] = useState([]);
 
   const [selectedMemberId, setSelectedMemberId] = useState("");
 
@@ -18,6 +20,8 @@ function MemberBill() {
   useEffect(() => {
     const savedMembers = localStorage.getItem("members");
     const savedCollections = localStorage.getItem("collections");
+    const savedFeed = localStorage.getItem("feedRecords");
+    const savedAdvance = localStorage.getItem("advanceRecords");
 
     if (savedMembers) {
       setMembers(JSON.parse(savedMembers));
@@ -25,6 +29,14 @@ function MemberBill() {
 
     if (savedCollections) {
       setCollections(JSON.parse(savedCollections));
+    }
+
+    if (savedFeed) {
+      setFeedRecords(JSON.parse(savedFeed));
+    }
+
+    if (savedAdvance) {
+      setAdvanceRecords(JSON.parse(savedAdvance));
     }
   }, []);
 
@@ -80,8 +92,47 @@ function MemberBill() {
     .reduce((total, collection) => total + Number(collection.amount), 0);
 
   const totalMilk = cowMilk + buffaloMilk;
-
   const totalAmount = cowAmount + buffaloAmount;
+
+  const billFeedRecords = feedRecords.filter(
+    (record) =>
+      record.memberId === selectedMemberId &&
+      record.date >= fromDate &&
+      record.date <= toDate &&
+      record.status === "Unpaid"
+  );
+
+  const feedDeduction = billFeedRecords.reduce(
+    (total, record) => total + Number(record.amount),
+    0
+  );
+
+  const billAdvanceRecords = advanceRecords.filter(
+    (record) =>
+      record.memberId === selectedMemberId &&
+      record.status === "Pending"
+  );
+
+  const advanceDue = billAdvanceRecords.reduce(
+    (total, record) =>
+      total + Number(record.remainingAmount || record.amount),
+    0
+  );
+
+  const totalDeduction =
+    feedDeduction + advanceDue;
+
+  const netPayable =
+    totalAmount > totalDeduction
+      ? totalAmount - totalDeduction
+      : 0;
+
+  const remainingDue =
+    totalDeduction > totalAmount
+      ? totalDeduction - totalAmount
+      : 0;
+
+
 
   function renderTable(data) {
     return (
@@ -182,13 +233,8 @@ function MemberBill() {
               </div>
 
               <div className="animal-total">
-                <p>
-                  <strong>Cow Milk:</strong> {cowMilk} L
-                </p>
-
-                <p>
-                  <strong>Cow Amount:</strong> ₹{cowAmount}
-                </p>
+                <p><strong>Cow Milk:</strong> {cowMilk} L</p>
+                <p><strong>Cow Amount:</strong> ₹{cowAmount}</p>
               </div>
             </div>
 
@@ -208,20 +254,56 @@ function MemberBill() {
               </div>
 
               <div className="animal-total">
-                <p>
-                  <strong>Buffalo Milk:</strong> {buffaloMilk} L
-                </p>
-
-                <p>
-                  <strong>Buffalo Amount:</strong> ₹{buffaloAmount}
-                </p>
+                <p><strong>Buffalo Milk:</strong> {buffaloMilk} L</p>
+                <p><strong>Buffalo Amount:</strong> ₹{buffaloAmount}</p>
               </div>
             </div>
           </div>
 
           <div className="bill-final-summary">
-            <h2>Total Milk: {totalMilk} L</h2>
-            <h2>Total Amount: ₹{totalAmount}</h2>
+
+            <h2>
+              Bill Summary
+            </h2>
+
+            <table className="bill-summary-table">
+
+              <tbody>
+
+                <tr>
+                  <td>Total Milk</td>
+                  <td>{totalMilk} L</td>
+                </tr>
+
+                <tr>
+                  <td>Milk Amount</td>
+                  <td>₹{totalAmount}</td>
+                </tr>
+
+                <tr>
+                  <td>Feed Deduction</td>
+                  <td>₹{feedDeduction}</td>
+                </tr>
+
+                <tr>
+                  <td>Advance Deduction</td>
+                  <td>₹{advanceDue}</td>
+                </tr>
+
+                <tr>
+                  <td>Remaining Due</td>
+                  <td>₹{remainingDue}</td>
+                </tr>
+
+                <tr className="net-payable-row">
+                  <td>Net Payable</td>
+                  <td>₹{netPayable}</td>
+                </tr>
+
+              </tbody>
+
+            </table>
+
           </div>
         </div>
       )}

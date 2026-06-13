@@ -805,3 +805,57 @@ body {
     grid-template-columns: 1fr;
   }
 }
+.bill-final-summary {
+
+  margin-top: 25px;
+
+  background: white;
+
+  padding: 20px;
+
+  border-radius: 15px;
+
+  box-shadow:
+  0 4px 15px rgba(0,0,0,0.08);
+
+}
+
+.bill-summary-table {
+
+  width: 100%;
+
+  border-collapse: collapse;
+
+  margin-top: 15px;
+
+}
+
+.bill-summary-table td {
+
+  border: 1px solid #ddd;
+
+  padding: 12px;
+
+  font-size: 16px;
+
+}
+
+.bill-summary-table td:first-child {
+
+  font-weight: 600;
+
+  background: #f8fafc;
+
+}
+
+.net-payable-row {
+
+  background: #e8f5e9;
+
+  font-size: 18px;
+
+  font-weight: bold;
+
+  color: #2e7d32;
+
+}
