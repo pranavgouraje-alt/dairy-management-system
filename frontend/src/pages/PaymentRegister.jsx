@@ -70,8 +70,7 @@ function PaymentRegister() {
         0
       );
 
-    const finalPay =
-      milkAmount;
+    const finalPay = milkAmount;
 
     return {
       memberId: member.memberId,

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
 import DashboardCard from "../components/DashboardCard";
+import { formatAmount }
+from "../utils/amountUtils";
 
 function Dashboard() {
   const [collections, setCollections] = useState([]);
@@ -60,7 +62,7 @@ function Dashboard() {
         }}
       >
         <DashboardCard title="Total Milk"      value={totalMilk}              unit="L"  icon="🥛" accent="#1976d2" highlight />
-        <DashboardCard title="Total Amount"    value={`₹${totalAmount}`}             icon="💰" accent="#2e7d32" highlight />
+        <DashboardCard title="Total Amount"   value={`₹${formatAmount(totalAmount)}`}            icon="💰" accent="#2e7d32" highlight />
         <DashboardCard title="Entries Today"   value={todayCollections.length}        icon="📋" accent="#6a1b9a" />
         <DashboardCard title="Cow Milk"        value={cowMilk}                unit="L"  icon="🐄" accent="#f57c00" />
         <DashboardCard title="Buffalo Milk"    value={buffaloMilk}            unit="L"  icon="🐃" accent="#00838f" />

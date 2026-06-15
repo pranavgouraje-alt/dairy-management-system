@@ -859,3 +859,18 @@ body {
   color: #2e7d32;
 
 }
+.generate-bill-btn {
+  margin-top: 20px;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.generate-bill-btn:hover {
+  background: #1b5e20;
+}

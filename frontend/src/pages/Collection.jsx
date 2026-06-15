@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
+import { formatAmount }
+from "../utils/amountUtils";
 
 function Collection() {
   const emptyForm = {
@@ -124,8 +126,7 @@ function Collection() {
     );
 
     updatedData.rate = rate;
-    updatedData.amount = Number(updatedData.quantity || 0) * rate;
-
+    updatedData.amount = Number(formatAmount( Number(updatedData.quantity || 0) *Number(rate)));
     setCollectionData(updatedData);
   }
 
