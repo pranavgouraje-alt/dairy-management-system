@@ -265,6 +265,302 @@ function MemberBill() {
     );
   }
 
+  const periodCollections =
+    collections.filter(
+      (collection) =>
+        collection.collectionDate >= fromDate &&
+        collection.collectionDate <= toDate
+    );
+  const billMemberIds =
+    [
+      ...new Set(
+        periodCollections.map(
+          (collection) =>
+            collection.memberId
+        )
+      )
+    ];
+
+  function calculateBillForMember(memberId) {
+    const member =
+      members.find(
+        (m) => m.memberId === memberId
+      );
+
+    const memberCollections =
+      periodCollections.filter(
+        (collection) =>
+          collection.memberId === memberId
+      );
+
+    const cowMilk =
+      memberCollections
+        .filter(
+          (collection) =>
+            collection.milkType === "Cow"
+        )
+        .reduce(
+          (total, collection) =>
+            total + Number(collection.quantity),
+          0
+        );
+
+    const buffaloMilk =
+      memberCollections
+        .filter(
+          (collection) =>
+            collection.milkType === "Buffalo"
+        )
+        .reduce(
+          (total, collection) =>
+            total + Number(collection.quantity),
+          0
+        );
+
+    const cowAmount =
+      memberCollections
+        .filter(
+          (collection) =>
+            collection.milkType === "Cow"
+        )
+        .reduce(
+          (total, collection) =>
+            total + Number(collection.amount),
+          0
+        );
+
+    const buffaloAmount =
+      memberCollections
+        .filter(
+          (collection) =>
+            collection.milkType === "Buffalo"
+        )
+        .reduce(
+          (total, collection) =>
+            total + Number(collection.amount),
+          0
+        );
+
+    const totalMilk =
+      cowMilk + buffaloMilk;
+
+    const milkAmount =
+      Number(
+        (
+          cowAmount +
+          buffaloAmount
+        ).toFixed(2)
+      );
+
+    const memberFeedRecords =
+      feedRecords.filter(
+        (record) =>
+          record.memberId === memberId &&
+          record.date >= fromDate &&
+          record.date <= toDate &&
+          record.status === "Unpaid"
+      );
+
+    const feedDue =
+      Number(
+        memberFeedRecords
+          .reduce(
+            (total, record) =>
+              total +
+              Number(record.amount || 0),
+            0
+          )
+          .toFixed(2)
+      );
+
+    const memberAdvanceRecords =
+      advanceRecords.filter(
+        (record) =>
+          record.memberId === memberId &&
+          record.status === "Pending"
+      );
+
+    const advanceDue =
+      Number(
+        memberAdvanceRecords
+          .reduce(
+            (total, record) =>
+              total +
+              Number(
+                record.remainingAmount ||
+                record.amount ||
+                0
+              ),
+            0
+          )
+          .toFixed(2)
+      );
+
+    const reserveAmount =
+      Number(
+        (milkAmount * 0.1)
+          .toFixed(2)
+      );
+
+    const amountAfterReserve =
+      Number(
+        (
+          milkAmount -
+          reserveAmount
+        ).toFixed(2)
+      );
+
+    const feedDeducted =
+      Number(
+        Math.min(
+          feedDue,
+          Math.max(
+            amountAfterReserve,
+            0
+          )
+        ).toFixed(2)
+      );
+
+    const amountAfterFeed =
+      Number(
+        (
+          amountAfterReserve -
+          feedDeducted
+        ).toFixed(2)
+      );
+
+    const advanceDeducted =
+      Number(
+        Math.min(
+          advanceDue,
+          Math.max(
+            amountAfterFeed,
+            0
+          )
+        ).toFixed(2)
+      );
+
+    const netPayable =
+      Number(
+        Math.max(
+          amountAfterFeed -
+          advanceDeducted,
+          0
+        ).toFixed(2)
+      );
+
+    const remainingDue =
+      Number(
+        (
+          feedDue +
+          advanceDue -
+          feedDeducted -
+          advanceDeducted
+        ).toFixed(2)
+      );
+
+    const totalDeduction =
+      Number(
+        (
+          reserveAmount +
+          feedDeducted +
+          advanceDeducted
+        ).toFixed(2)
+      );
+
+    return {
+      billId: Date.now() + Number(memberId),
+
+      memberId,
+      memberName: member?.name || "",
+
+      billMonth,
+      billCycle,
+
+      fromDate,
+      toDate,
+
+      totalMilk,
+      cowMilk,
+      buffaloMilk,
+
+      milkAmount,
+
+      cowAmount,
+      buffaloAmount,
+
+      reserveAmount,
+
+      feedDue,
+      feedDeducted,
+
+      advanceDue,
+      advanceDeducted,
+
+      totalDeduction,
+      remainingDue,
+      netPayable,
+
+      financialYear:
+        getFinancialYear(fromDate),
+
+      generatedDate:
+        new Date()
+          .toISOString()
+          .split("T")[0],
+
+      generatedTime:
+        new Date()
+          .toLocaleTimeString()
+    };
+  }
+
+  function generateAllBills() {
+    if (periodCollections.length === 0) {
+      alert(
+        "No milk collection found for this billing cycle"
+      );
+      return;
+    }
+
+    const newBills = [];
+
+    billMemberIds.forEach(
+      (memberId) => {
+        const alreadyGenerated =
+          billRecords.some(
+            (bill) =>
+              bill.memberId === memberId &&
+              bill.billMonth === billMonth &&
+              bill.billCycle === billCycle
+          );
+
+        if (!alreadyGenerated) {
+          const bill =
+            calculateBillForMember(memberId);
+
+          newBills.push(bill);
+        }
+      }
+    );
+
+    if (newBills.length === 0) {
+      alert(
+        "All bills are already generated for this cycle"
+      );
+      return;
+    }
+
+    setBillRecords([
+      ...billRecords,
+      ...newBills
+    ]);
+
+    alert(
+      `${newBills.length} bills generated successfully`
+    );
+  }
+
   function generateBill() {
     if (!selectedMemberId) {
       alert("Please select member");
@@ -555,9 +851,9 @@ function MemberBill() {
 
             <button
               className="generate-bill-btn"
-              onClick={generateBill}
+              onClick={generateAllBills}
             >
-              Generate Bill
+              Generate All Bills
             </button>
           </div>
         </div>
