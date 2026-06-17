@@ -1,105 +1,137 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
+import { formatAmount } from "../utils/amountUtils";
 
 function PaymentRegister() {
-  const [members, setMembers] = useState([]);
-  const [collections, setCollections] = useState([]);
+  const [billRecords, setBillRecords] = useState([]);
 
-  const [fromDate, setFromDate] = useState(
-    new Date().toISOString().split("T")[0]
+  const [billMonth, setBillMonth] = useState(
+    new Date().toISOString().slice(0, 7)
   );
 
-  const [toDate, setToDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [billCycle, setBillCycle] = useState("1");
 
   useEffect(() => {
-    const savedMembers = localStorage.getItem("members");
-    const savedCollections = localStorage.getItem("collections");
+    const savedBills =
+      localStorage.getItem("billRecords");
 
-    if (savedMembers) {
-      setMembers(JSON.parse(savedMembers));
-    }
-
-    if (savedCollections) {
-      setCollections(JSON.parse(savedCollections));
+    if (savedBills) {
+      setBillRecords(JSON.parse(savedBills));
     }
   }, []);
 
-  const periodCollections = collections.filter(
-    (collection) =>
-      collection.collectionDate >= fromDate &&
-      collection.collectionDate <= toDate
-  );
+  function getBillingDates(month, cycle) {
+    const [year, monthNumber] = month.split("-");
 
-  const paymentRows = members.map((member) => {
-    const memberCollections = periodCollections.filter(
-      (collection) =>
-        collection.memberId === member.memberId
-    );
+    let fromDay = "01";
+    let toDay = "10";
 
-    const cowMilk = memberCollections
-      .filter(
-        (collection) =>
-          collection.milkType === "Cow"
-      )
-      .reduce(
-        (total, collection) =>
-          total + Number(collection.quantity),
+    if (cycle === "2") {
+      fromDay = "11";
+      toDay = "20";
+    }
+
+    if (cycle === "3") {
+      fromDay = "21";
+
+      const lastDay = new Date(
+        Number(year),
+        Number(monthNumber),
         0
-      );
+      ).getDate();
 
-    const buffaloMilk = memberCollections
-      .filter(
-        (collection) =>
-          collection.milkType === "Buffalo"
-      )
-      .reduce(
-        (total, collection) =>
-          total + Number(collection.quantity),
-        0
-      );
-
-    const totalMilk =
-      cowMilk + buffaloMilk;
-
-    const milkAmount =
-      memberCollections.reduce(
-        (total, collection) =>
-          total + Number(collection.amount),
-        0
-      );
-
-    const finalPay = milkAmount;
+      toDay = String(lastDay).padStart(2, "0");
+    }
 
     return {
-      memberId: member.memberId,
-      name: member.name,
-      village: member.village,
-      cowMilk,
-      buffaloMilk,
-      totalMilk,
-      milkAmount,
-      finalPay,
+      fromDate: `${year}-${monthNumber}-${fromDay}`,
+      toDate: `${year}-${monthNumber}-${toDay}`,
     };
-  });
+  }
 
-  const payableRows =
-    paymentRows.filter(
-      (row) => row.totalMilk > 0
+  const billingDates =
+    getBillingDates(billMonth, billCycle);
+
+  const fromDate = billingDates.fromDate;
+  const toDate = billingDates.toDate;
+
+  const paymentRows =
+    billRecords.filter(
+      (bill) =>
+        bill.billMonth === billMonth &&
+        bill.billCycle === billCycle
     );
 
-  const totalMilk =
-    payableRows.reduce(
-      (total, row) =>
-        total + row.totalMilk,
+  const totalMembers =
+    paymentRows.length;
+
+  const totalCowMilk =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.cowMilk || 0),
       0
     );
 
-  const totalAmount =
-    payableRows.reduce(
-      (total, row) =>
-        total + row.finalPay,
+  const totalBuffaloMilk =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.buffaloMilk || 0),
+      0
+    );
+
+  const totalMilk =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.totalMilk || 0),
+      0
+    );
+
+  const totalMilkAmount =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.milkAmount || 0),
+      0
+    );
+
+  const totalReserve =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.reserveAmount || 0),
+      0
+    );
+
+  const totalFeed =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.feedDeducted || 0),
+      0
+    );
+
+  const totalAdvance =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.advanceDeducted || 0),
+      0
+    );
+
+  const totalDeduction =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.totalDeduction || 0),
+      0
+    );
+
+  const totalRemainingDue =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.remainingDue || 0),
+      0
+    );
+
+  const totalNetPayable =
+    paymentRows.reduce(
+      (total, bill) =>
+        total + Number(bill.netPayable || 0),
       0
     );
 
@@ -109,39 +141,55 @@ function PaymentRegister() {
 
       <div className="collection-form">
         <input
-          type="date"
-          value={fromDate}
+          type="month"
+          value={billMonth}
           onChange={(e) =>
-            setFromDate(e.target.value)
+            setBillMonth(e.target.value)
           }
         />
 
-        <input
-          type="date"
-          value={toDate}
+        <select
+          value={billCycle}
           onChange={(e) =>
-            setToDate(e.target.value)
+            setBillCycle(e.target.value)
           }
-        />
+        >
+          <option value="1">
+            Cycle 1: 1 - 10
+          </option>
+
+          <option value="2">
+            Cycle 2: 11 - 20
+          </option>
+
+          <option value="3">
+            Cycle 3: 21 - End Month
+          </option>
+        </select>
       </div>
+
+      <p>
+        <strong>Billing Period:</strong>{" "}
+        {fromDate} to {toDate}
+      </p>
 
       <div className="session-summary-grid">
         <div className="session-summary-card">
-          <h3>Total Members</h3>
-          <h2>{payableRows.length}</h2>
-          <p>Members with milk</p>
+          <h3>Total Bills</h3>
+          <h2>{totalMembers}</h2>
+          <p>Generated bills</p>
         </div>
 
         <div className="session-summary-card">
           <h3>Total Milk</h3>
-          <h2>{totalMilk} L</h2>
-          <p>Period milk</p>
+          <h2>{formatAmount(totalMilk)} L</h2>
+          <p>Cycle milk</p>
         </div>
 
         <div className="session-summary-card">
-          <h3>Total Payable</h3>
-          <h2>₹{totalAmount}</h2>
-          <p>Owner payment amount</p>
+          <h3>Net Payable</h3>
+          <h2>₹{formatAmount(totalNetPayable)}</h2>
+          <p>Amount to distribute</p>
         </div>
       </div>
 
@@ -150,30 +198,197 @@ function PaymentRegister() {
           <tr>
             <th>ID</th>
             <th>Member Name</th>
-            <th>Village</th>
             <th>Cow Milk</th>
             <th>Buffalo Milk</th>
             <th>Total Milk</th>
             <th>Milk Amount</th>
-            <th>Final Pay</th>
+            <th>Reserve</th>
+            <th>Feed</th>
+            <th>Advance</th>
+            <th>Total Deduction</th>
+            <th>Remaining Due</th>
+            <th>Net Payable</th>
           </tr>
         </thead>
 
         <tbody>
-          {payableRows.map((row) => (
-            <tr key={row.memberId}>
-              <td>{row.memberId}</td>
-              <td>{row.name}</td>
-              <td>{row.village}</td>
-              <td>{row.cowMilk} L</td>
-              <td>{row.buffaloMilk} L</td>
-              <td>{row.totalMilk} L</td>
-              <td>₹{row.milkAmount}</td>
-              <td>₹{row.finalPay}</td>
+          {paymentRows.length === 0 ? (
+            <tr>
+              <td colSpan="12">
+                No generated bills found for this cycle.
+              </td>
             </tr>
-          ))}
+          ) : (
+            paymentRows.map((bill) => (
+              <tr key={bill.billId}>
+                <td>{bill.memberId}</td>
+
+                <td>{bill.memberName}</td>
+
+                <td>
+                  {formatAmount(bill.cowMilk)} L
+                </td>
+
+                <td>
+                  {formatAmount(bill.buffaloMilk)} L
+                </td>
+
+                <td>
+                  {formatAmount(bill.totalMilk)} L
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.milkAmount)}
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.reserveAmount)}
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.feedDeducted)}
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.advanceDeducted)}
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.totalDeduction)}
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.remainingDue)}
+                </td>
+
+                <td>
+                  ₹{formatAmount(bill.netPayable)}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
+
+      <div className="payment-summary-section">
+        <h2>Payment Register Summary</h2>
+
+        <table className="payment-summary-table">
+          <thead>
+            <tr>
+              <th>Cow Information</th>
+              <th>Buffalo Information</th>
+              <th>Total Information</th>
+              <th>Deduction Information</th>
+              <th>Payment Information</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr>
+              <td>
+                <strong>Total Cow Liter</strong>
+                <br />
+                {formatAmount(totalCowMilk)} L
+              </td>
+
+              <td>
+                <strong>Total Buffalo Liter</strong>
+                <br />
+                {formatAmount(totalBuffaloMilk)} L
+              </td>
+
+              <td>
+                <strong>Total Milk</strong>
+                <br />
+                {formatAmount(totalMilk)} L
+              </td>
+
+              <td>
+                <strong>Total Reserve</strong>
+                <br />
+                ₹{formatAmount(totalReserve)}
+              </td>
+
+              <td>
+                <strong>Net Payable</strong>
+                <br />
+                ₹{formatAmount(totalNetPayable)}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Cow Amount</strong>
+                <br />
+                ₹{formatAmount(
+                  totalMilkAmount -
+                    paymentRows.reduce(
+                      (total, bill) =>
+                        total +
+                        Number(bill.buffaloAmount || 0),
+                      0
+                    )
+                )}
+              </td>
+
+              <td>
+                <strong>Buffalo Amount</strong>
+                <br />
+                ₹{formatAmount(
+                  paymentRows.reduce(
+                    (total, bill) =>
+                      total +
+                      Number(bill.buffaloAmount || 0),
+                    0
+                  )
+                )}
+              </td>
+
+              <td>
+                <strong>Milk Amount</strong>
+                <br />
+                ₹{formatAmount(totalMilkAmount)}
+              </td>
+
+              <td>
+                <strong>Feed Deducted</strong>
+                <br />
+                ₹{formatAmount(totalFeed)}
+              </td>
+
+              <td>
+                <strong>Remaining Due</strong>
+                <br />
+                ₹{formatAmount(totalRemainingDue)}
+              </td>
+            </tr>
+
+            <tr>
+              <td>-</td>
+              <td>-</td>
+
+              <td>
+                <strong>Total Deduction</strong>
+                <br />
+                ₹{formatAmount(totalDeduction)}
+              </td>
+
+              <td>
+                <strong>Advance Deducted</strong>
+                <br />
+                ₹{formatAmount(totalAdvance)}
+              </td>
+
+              <td>
+                <strong>Final Payable</strong>
+                <br />
+                ₹{formatAmount(totalNetPayable)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </MainLayout>
   );
 }

@@ -874,3 +874,41 @@ body {
 .generate-bill-btn:hover {
   background: #1b5e20;
 }
+
+.payment-summary-section {
+  margin-top: 35px;
+  background: white;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.payment-summary-section h2 {
+  text-align: center;
+  color: #1976d2;
+  margin-bottom: 20px;
+}
+
+.payment-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payment-summary-table th {
+  background: #81d4fa;
+  color: #0d1b2a;
+  padding: 12px;
+  border: 1px solid #555;
+  font-size: 16px;
+}
+
+.payment-summary-table td {
+  border: 1px solid #555;
+  padding: 16px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.payment-summary-table strong {
+  color: #111827;
+}
