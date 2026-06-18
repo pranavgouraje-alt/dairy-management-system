@@ -133,37 +133,144 @@ function MemberBill() {
       collection.session === "Evening"
   );
 
-  const cowMilk = billCollections
-    .filter((collection) => collection.milkType === "Cow")
-    .reduce(
-      (total, collection) =>
-        total + Number(collection.quantity),
-      0
+  function getMilkTotal(data, milkType) {
+    return data
+      .filter((collection) => collection.milkType === milkType)
+      .reduce(
+        (total, collection) =>
+          total + Number(collection.quantity || 0),
+        0
+      );
+  }
+
+  function getAmountTotal(data, milkType) {
+    return data
+      .filter((collection) => collection.milkType === milkType)
+      .reduce(
+        (total, collection) =>
+          total + Number(collection.amount || 0),
+        0
+      );
+  }
+
+  function calculateDeductions({
+    milkAmount,
+    feedDue,
+    advanceDue,
+  }) {
+    const reserveAmount = Number(
+      (milkAmount * 0.1).toFixed(2)
     );
 
-  const buffaloMilk = billCollections
-    .filter((collection) => collection.milkType === "Buffalo")
-    .reduce(
-      (total, collection) =>
-        total + Number(collection.quantity),
-      0
+    const amountAfterReserve = Number(
+      (milkAmount - reserveAmount).toFixed(2)
     );
 
-  const cowAmount = billCollections
-    .filter((collection) => collection.milkType === "Cow")
-    .reduce(
-      (total, collection) =>
-        total + Number(collection.amount),
-      0
+    const feedDeducted = Number(
+      Math.min(
+        feedDue,
+        Math.max(amountAfterReserve, 0)
+      ).toFixed(2)
     );
 
-  const buffaloAmount = billCollections
-    .filter((collection) => collection.milkType === "Buffalo")
-    .reduce(
-      (total, collection) =>
-        total + Number(collection.amount),
-      0
+    const amountAfterFeed = Number(
+      (amountAfterReserve - feedDeducted).toFixed(2)
     );
+
+    const advanceDeducted = Number(
+      Math.min(
+        advanceDue,
+        Math.max(amountAfterFeed, 0)
+      ).toFixed(2)
+    );
+
+    const netPayable = Number(
+      Math.max(
+        amountAfterFeed - advanceDeducted,
+        0
+      ).toFixed(2)
+    );
+
+    const remainingDue = Number(
+      (
+        feedDue +
+        advanceDue -
+        feedDeducted -
+        advanceDeducted
+      ).toFixed(2)
+    );
+
+    const totalDeduction = Number(
+      (
+        reserveAmount +
+        feedDeducted +
+        advanceDeducted
+      ).toFixed(2)
+    );
+
+    return {
+      reserveAmount,
+      feedDeducted,
+      advanceDeducted,
+      totalDeduction,
+      remainingDue,
+      netPayable,
+    };
+  }
+
+  function getFeedDue(memberId) {
+    const memberFeedRecords = feedRecords.filter(
+      (record) =>
+        record.memberId === memberId &&
+        record.date >= fromDate &&
+        record.date <= toDate &&
+        record.status !== "Deducted"
+    );
+
+    return Number(
+      memberFeedRecords
+        .reduce(
+          (total, record) =>
+            total +
+            Number(
+              record.remainingAmount ??
+              record.amount ??
+              0
+            ),
+          0
+        )
+        .toFixed(2)
+    );
+  }
+
+  function getAdvanceDue(memberId) {
+    const memberAdvanceRecords = advanceRecords.filter(
+      (record) =>
+        record.memberId === memberId &&
+        record.status !== "Cleared"
+    );
+
+    return Number(
+      memberAdvanceRecords
+        .reduce(
+          (total, record) =>
+            total +
+            Number(
+              record.remainingAmount ??
+              record.amount ??
+              0
+            ),
+          0
+        )
+        .toFixed(2)
+    );
+  }
+
+  const cowMilk = getMilkTotal(billCollections, "Cow");
+  const buffaloMilk = getMilkTotal(billCollections, "Buffalo");
+
+  const cowAmount = getAmountTotal(billCollections, "Cow");
+  const buffaloAmount = getAmountTotal(billCollections, "Buffalo");
 
   const totalMilk = cowMilk + buffaloMilk;
 
@@ -171,305 +278,73 @@ function MemberBill() {
     (cowAmount + buffaloAmount).toFixed(2)
   );
 
-  const billFeedRecords = feedRecords.filter(
-    (record) =>
-      record.memberId === selectedMemberId &&
-      record.date >= fromDate &&
-      record.date <= toDate &&
-      record.status === "Unpaid"
+  const feedDeduction = getFeedDue(selectedMemberId);
+  const advanceDue = getAdvanceDue(selectedMemberId);
+
+  const singleBillDeductions = calculateDeductions({
+    milkAmount: totalAmount,
+    feedDue: feedDeduction,
+    advanceDue,
+  });
+
+  const reserveAmount = singleBillDeductions.reserveAmount;
+  const feedDeductionApplied = singleBillDeductions.feedDeducted;
+  const advanceDeductionApplied = singleBillDeductions.advanceDeducted;
+  const totalDeduction = singleBillDeductions.totalDeduction;
+  const remainingDue = singleBillDeductions.remainingDue;
+  const netPayable = singleBillDeductions.netPayable;
+
+  const periodCollections = collections.filter(
+    (collection) =>
+      collection.collectionDate >= fromDate &&
+      collection.collectionDate <= toDate
   );
 
-  const feedDeduction = Number(
-    billFeedRecords
-      .reduce(
-        (total, record) =>
-          total + Number(record.amount || 0),
-        0
+  const billMemberIds = [
+    ...new Set(
+      periodCollections.map(
+        (collection) => collection.memberId
       )
-      .toFixed(2)
-  );
+    ),
+  ];
 
-  const billAdvanceRecords = advanceRecords.filter(
-    (record) =>
-      record.memberId === selectedMemberId &&
-      record.status === "Pending"
-  );
+  function createBillRecord(memberId) {
+    const member = members.find(
+      (m) => m.memberId === memberId
+    );
 
-  const advanceDue = Number(
-    billAdvanceRecords
-      .reduce(
-        (total, record) =>
-          total +
-          Number(record.remainingAmount || record.amount || 0),
-        0
-      )
-      .toFixed(2)
-  );
+    const memberCollections = periodCollections.filter(
+      (collection) => collection.memberId === memberId
+    );
 
-  const reserveAmount = Number(
-    (totalAmount * 0.1).toFixed(2)
-  );
+    const cowMilk = getMilkTotal(memberCollections, "Cow");
+    const buffaloMilk = getMilkTotal(memberCollections, "Buffalo");
 
-  const amountAfterReserve = Number(
-    (totalAmount - reserveAmount).toFixed(2)
-  );
+    const cowAmount = getAmountTotal(memberCollections, "Cow");
+    const buffaloAmount = getAmountTotal(
+      memberCollections,
+      "Buffalo"
+    );
 
-  const feedDeductionApplied = Number(
-    Math.min(
-      feedDeduction,
-      Math.max(amountAfterReserve, 0)
-    ).toFixed(2)
-  );
+    const totalMilk = cowMilk + buffaloMilk;
 
-  const amountAfterFeed = Number(
-    (amountAfterReserve - feedDeductionApplied).toFixed(2)
-  );
+    const milkAmount = Number(
+      (cowAmount + buffaloAmount).toFixed(2)
+    );
 
-  const advanceDeductionApplied = Number(
-    Math.min(
+    const feedDue = getFeedDue(memberId);
+    const advanceDue = getAdvanceDue(memberId);
+
+    const deductionResult = calculateDeductions({
+      milkAmount,
+      feedDue,
       advanceDue,
-      Math.max(amountAfterFeed, 0)
-    ).toFixed(2)
-  );
-
-  const netPayable = Number(
-    Math.max(
-      amountAfterFeed - advanceDeductionApplied,
-      0
-    ).toFixed(2)
-  );
-
-  const remainingDue = Number(
-    (
-      feedDeduction +
-      advanceDue -
-      feedDeductionApplied -
-      advanceDeductionApplied
-    ).toFixed(2)
-  );
-
-  const totalDeduction = Number(
-    (
-      reserveAmount +
-      feedDeductionApplied +
-      advanceDeductionApplied
-    ).toFixed(2)
-  );
-
-  function isBillAlreadyGenerated() {
-    return billRecords.some(
-      (bill) =>
-        bill.memberId === selectedMemberId &&
-        bill.billMonth === billMonth &&
-        bill.billCycle === billCycle
-    );
-  }
-
-  const periodCollections =
-    collections.filter(
-      (collection) =>
-        collection.collectionDate >= fromDate &&
-        collection.collectionDate <= toDate
-    );
-  const billMemberIds =
-    [
-      ...new Set(
-        periodCollections.map(
-          (collection) =>
-            collection.memberId
-        )
-      )
-    ];
-
-  function calculateBillForMember(memberId) {
-    const member =
-      members.find(
-        (m) => m.memberId === memberId
-      );
-
-    const memberCollections =
-      periodCollections.filter(
-        (collection) =>
-          collection.memberId === memberId
-      );
-
-    const cowMilk =
-      memberCollections
-        .filter(
-          (collection) =>
-            collection.milkType === "Cow"
-        )
-        .reduce(
-          (total, collection) =>
-            total + Number(collection.quantity),
-          0
-        );
-
-    const buffaloMilk =
-      memberCollections
-        .filter(
-          (collection) =>
-            collection.milkType === "Buffalo"
-        )
-        .reduce(
-          (total, collection) =>
-            total + Number(collection.quantity),
-          0
-        );
-
-    const cowAmount =
-      memberCollections
-        .filter(
-          (collection) =>
-            collection.milkType === "Cow"
-        )
-        .reduce(
-          (total, collection) =>
-            total + Number(collection.amount),
-          0
-        );
-
-    const buffaloAmount =
-      memberCollections
-        .filter(
-          (collection) =>
-            collection.milkType === "Buffalo"
-        )
-        .reduce(
-          (total, collection) =>
-            total + Number(collection.amount),
-          0
-        );
-
-    const totalMilk =
-      cowMilk + buffaloMilk;
-
-    const milkAmount =
-      Number(
-        (
-          cowAmount +
-          buffaloAmount
-        ).toFixed(2)
-      );
-
-    const memberFeedRecords =
-      feedRecords.filter(
-        (record) =>
-          record.memberId === memberId &&
-          record.date >= fromDate &&
-          record.date <= toDate &&
-          record.status === "Unpaid"
-      );
-
-    const feedDue =
-      Number(
-        memberFeedRecords
-          .reduce(
-            (total, record) =>
-              total +
-              Number(record.amount || 0),
-            0
-          )
-          .toFixed(2)
-      );
-
-    const memberAdvanceRecords =
-      advanceRecords.filter(
-        (record) =>
-          record.memberId === memberId &&
-          record.status === "Pending"
-      );
-
-    const advanceDue =
-      Number(
-        memberAdvanceRecords
-          .reduce(
-            (total, record) =>
-              total +
-              Number(
-                record.remainingAmount ||
-                record.amount ||
-                0
-              ),
-            0
-          )
-          .toFixed(2)
-      );
-
-    const reserveAmount =
-      Number(
-        (milkAmount * 0.1)
-          .toFixed(2)
-      );
-
-    const amountAfterReserve =
-      Number(
-        (
-          milkAmount -
-          reserveAmount
-        ).toFixed(2)
-      );
-
-    const feedDeducted =
-      Number(
-        Math.min(
-          feedDue,
-          Math.max(
-            amountAfterReserve,
-            0
-          )
-        ).toFixed(2)
-      );
-
-    const amountAfterFeed =
-      Number(
-        (
-          amountAfterReserve -
-          feedDeducted
-        ).toFixed(2)
-      );
-
-    const advanceDeducted =
-      Number(
-        Math.min(
-          advanceDue,
-          Math.max(
-            amountAfterFeed,
-            0
-          )
-        ).toFixed(2)
-      );
-
-    const netPayable =
-      Number(
-        Math.max(
-          amountAfterFeed -
-          advanceDeducted,
-          0
-        ).toFixed(2)
-      );
-
-    const remainingDue =
-      Number(
-        (
-          feedDue +
-          advanceDue -
-          feedDeducted -
-          advanceDeducted
-        ).toFixed(2)
-      );
-
-    const totalDeduction =
-      Number(
-        (
-          reserveAmount +
-          feedDeducted +
-          advanceDeducted
-        ).toFixed(2)
-      );
+    });
 
     return {
-      billId: Date.now() + Number(memberId),
+      billId:
+        Date.now() +
+        Math.floor(Math.random() * 100000),
 
       memberId,
       memberName: member?.name || "",
@@ -485,80 +360,31 @@ function MemberBill() {
       buffaloMilk,
 
       milkAmount,
-
       cowAmount,
       buffaloAmount,
 
-      reserveAmount,
+      reserveAmount: deductionResult.reserveAmount,
 
       feedDue,
-      feedDeducted,
+      feedDeducted: deductionResult.feedDeducted,
 
       advanceDue,
-      advanceDeducted,
+      advanceDeducted: deductionResult.advanceDeducted,
 
-      totalDeduction,
-      remainingDue,
-      netPayable,
+      totalDeduction: deductionResult.totalDeduction,
+      remainingDue: deductionResult.remainingDue,
+      netPayable: deductionResult.netPayable,
 
-      financialYear:
-        getFinancialYear(fromDate),
+      financialYear: getFinancialYear(fromDate),
 
-      generatedDate:
-        new Date()
-          .toISOString()
-          .split("T")[0],
+      billStatus: "Generated",
 
-      generatedTime:
-        new Date()
-          .toLocaleTimeString()
+      generatedDate: new Date()
+        .toISOString()
+        .split("T")[0],
+
+      generatedTime: new Date().toLocaleTimeString(),
     };
-  }
-
-  function generateAllBills() {
-    if (periodCollections.length === 0) {
-      alert(
-        "No milk collection found for this billing cycle"
-      );
-      return;
-    }
-
-    const newBills = [];
-
-    billMemberIds.forEach(
-      (memberId) => {
-        const alreadyGenerated =
-          billRecords.some(
-            (bill) =>
-              bill.memberId === memberId &&
-              bill.billMonth === billMonth &&
-              bill.billCycle === billCycle
-          );
-
-        if (!alreadyGenerated) {
-          const bill =
-            calculateBillForMember(memberId);
-
-          newBills.push(bill);
-        }
-      }
-    );
-
-    if (newBills.length === 0) {
-      alert(
-        "All bills are already generated for this cycle"
-      );
-      return;
-    }
-
-    setBillRecords([
-      ...billRecords,
-      ...newBills
-    ]);
-
-    alert(
-      `${newBills.length} bills generated successfully`
-    );
   }
 
   function generateBill() {
@@ -572,57 +398,53 @@ function MemberBill() {
       return;
     }
 
-    if (isBillAlreadyGenerated()) {
-      alert("Bill already generated for this member and cycle");
-      return;
-    }
+    const billRecord = createBillRecord(selectedMemberId);
 
-    const billRecord = {
-      billId: Date.now(),
-
-      memberId: selectedMemberId,
-      memberName: selectedMember?.name,
-
-      billMonth,
-      billCycle,
-
-      fromDate,
-      toDate,
-
-      totalMilk,
-      cowMilk,
-      buffaloMilk,
-
-      milkAmount: totalAmount,
-
-      reserveAmount,
-
-      feedDue: feedDeduction,
-      feedDeducted: feedDeductionApplied,
-
-      advanceDue,
-      advanceDeducted: advanceDeductionApplied,
-
-      totalDeduction,
-      remainingDue,
-      netPayable,
-
-      financialYear: getFinancialYear(fromDate),
-
-      generatedDate: new Date()
-        .toISOString()
-        .split("T")[0],
-
-      generatedTime: new Date()
-        .toLocaleTimeString(),
-    };
+    const filteredBills = billRecords.filter(
+      (bill) =>
+        !(
+          bill.memberId === selectedMemberId &&
+          bill.billMonth === billMonth &&
+          bill.billCycle === billCycle
+        )
+    );
 
     setBillRecords([
-      ...billRecords,
+      ...filteredBills,
       billRecord,
     ]);
 
-    alert("Bill generated successfully");
+    alert("Bill generated / updated successfully");
+  }
+
+  function generateAllBills() {
+    if (periodCollections.length === 0) {
+      alert(
+        "No milk collection found for this billing cycle"
+      );
+      return;
+    }
+
+    const newBills = billMemberIds.map(
+      (memberId) => createBillRecord(memberId)
+    );
+
+    const filteredBills = billRecords.filter(
+      (bill) =>
+        !(
+          bill.billMonth === billMonth &&
+          bill.billCycle === billCycle
+        )
+    );
+
+    setBillRecords([
+      ...filteredBills,
+      ...newBills,
+    ]);
+
+    alert(
+      `${newBills.length} bills generated / updated successfully`
+    );
   }
 
   function renderTable(data) {
@@ -717,10 +539,19 @@ function MemberBill() {
         {fromDate} to {toDate}
       </p>
 
+      <div style={{ marginBottom: "20px" }}>
+        <button
+          className="generate-bill-btn"
+          onClick={generateAllBills}
+        >
+          Generate / Update All Bills
+        </button>
+      </div>
+
       {selectedMemberId && (
         <div className="bill-box">
           <div className="bill-header">
-            <h2>Milk Bill</h2>
+            <h2>Milk Bill Preview</h2>
 
             <p>
               <strong>Member:</strong>{" "}
@@ -851,9 +682,9 @@ function MemberBill() {
 
             <button
               className="generate-bill-btn"
-              onClick={generateAllBills}
+              onClick={generateBill}
             >
-              Generate All Bills
+              Generate / Update This Bill
             </button>
           </div>
         </div>
