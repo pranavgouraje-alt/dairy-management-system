@@ -98,6 +98,17 @@ function Reports() {
             </p>
           </div>
         </Link>
+        <Link
+          to="/bill-history"
+          className="report-link"
+        >
+          <div className="report-card">
+            <h3>📜 Bill History</h3>
+            <p>
+              View generated bill records
+            </p>
+          </div>
+        </Link>
 
       </div>
 

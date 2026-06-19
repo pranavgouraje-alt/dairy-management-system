@@ -14,6 +14,7 @@ import MemberBill from "../pages/MemberBill";
 import FeedManagement from "../pages/FeedMaanagement";
 import AdvanceManagement from "../pages/AdvanceManagement";
 import FeedAdvanceReport from "../pages/FeedAdvancerRport";
+import BillHistory from "../pages/BillHistory";
 
 function AppRoutes() {
   return (
@@ -32,6 +33,7 @@ function AppRoutes() {
       <Route path="/payment-register" element={<PaymentRegister />} />
       <Route path="/member-bill" element={<MemberBill />} />
       <Route path="/feed-advance-report" element={<FeedAdvanceReport />} />
+      <Route path="/bill-history" element={<BillHistory />} />
        
 
 
