@@ -913,3 +913,42 @@ body {
   color: #111827;
 }
 
+.print-bill-btn {
+  margin-top: 20px;
+  margin-left: 12px;
+  background: #6a1b9a;
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .navbar,
+  .sidebar,
+  .collection-form,
+  .generate-bill-btn,
+  .print-bill-btn {
+    display: none !important;
+  }
+}
+
