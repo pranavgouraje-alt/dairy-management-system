@@ -110,6 +110,18 @@ function Reports() {
           </div>
         </Link>
 
+        <Link
+          to="/reserve-report"
+          className="report-link"
+        >
+          <div className="report-card">
+            <h3>🏦 Reserve Report</h3>
+            <p>
+              View member-wise reserve amount
+            </p>
+          </div>
+        </Link>
+
       </div>
 
     </MainLayout>
