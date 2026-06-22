@@ -952,3 +952,224 @@ body {
   }
 }
 
+.print-all-area {
+  margin-top: 20px;
+}
+
+.single-print-bill {
+  background: white;
+  padding: 25px;
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-all-area,
+  .print-all-area * {
+    visibility: visible;
+  }
+
+  .print-all-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .single-print-bill {
+    page-break-after: always;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .sidebar,
+  .navbar,
+  .no-print,
+  .print-bill-btn {
+    display: none !important;
+  }
+}
+
+/* Compact one-page member bill layout */
+
+.compact-bill {
+  background: white;
+  padding: 12px;
+  color: #000;
+  font-size: 12px;
+}
+
+.compact-bill-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.compact-bill-header h2 {
+  color: #1976d2;
+  margin: 0;
+  font-size: 22px;
+}
+
+.compact-bill-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+.compact-ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.compact-ledger-table th,
+.compact-ledger-table td {
+  border: 1px solid #333;
+  padding: 3px;
+  text-align: center;
+}
+
+.compact-ledger-table th {
+  background: #eeeeee;
+  font-weight: bold;
+}
+
+.compact-total-row {
+  background: #f1f1f1;
+  font-weight: bold;
+}
+
+.compact-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.compact-summary-box {
+  border: 1px solid #333;
+  padding: 8px;
+  min-height: 90px;
+}
+
+.compact-summary-box h4 {
+  text-align: center;
+  margin: 0 0 6px;
+  color: #555;
+}
+
+.compact-summary-box p {
+  margin: 4px 0;
+}
+
+.bill-info-box h3 {
+  margin: 6px 0 0;
+  color: green;
+  font-size: 15px;
+}
+
+.compact-bottom-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 10px;
+  border: 1px solid #333;
+}
+
+.compact-bottom-summary div {
+  border-right: 1px solid #333;
+  padding: 8px;
+  text-align: center;
+}
+
+.compact-bottom-summary div:last-child {
+  border-right: none;
+  color: green;
+  font-weight: bold;
+}
+
+.single-print-bill {
+  background: white;
+  margin-bottom: 20px;
+}
+
+.print-bill-btn {
+  margin-top: 20px;
+  padding: 14px 24px;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.print-bill-btn:hover {
+  background: #0d47a1;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 6mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area *,
+  .print-all-area,
+  .print-all-area * {
+    visibility: visible;
+  }
+
+  .print-area,
+  .print-all-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .compact-bill {
+    font-size: 10px;
+    padding: 0;
+  }
+
+  .compact-ledger-table {
+    font-size: 9px;
+  }
+
+  .compact-ledger-table th,
+  .compact-ledger-table td {
+    padding: 2px;
+  }
+
+  .compact-summary-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .single-print-bill {
+    page-break-after: always;
+  }
+
+  .single-print-bill:last-child {
+    page-break-after: auto;
+  }
+
+  .sidebar,
+  .navbar,
+  .collection-form,
+  .generate-bill-btn,
+  .print-bill-btn,
+  .no-print {
+    display: none !important;
+  }
+}

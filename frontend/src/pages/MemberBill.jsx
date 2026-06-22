@@ -549,7 +549,6 @@ function MemberBill() {
       </div>
 
       {selectedMemberId && (
-        <div className="print-area">
         <div className="bill-box">
           <div className="bill-header">
             <h2>Milk Bill Preview</h2>
@@ -681,25 +680,15 @@ function MemberBill() {
               </tbody>
             </table>
 
-            {/* <button
+            <button
               className="generate-bill-btn"
               onClick={generateBill}
             >
               Generate / Update This Bill
-            </button> */}
-
-                     <button
-            className="print-bill-btn"
-            onClick={() => window.print()}
-          >
-            Print Bill
-          </button>
+            </button>
           </div>
-
         </div>
-
-      </div>
-    )}
+      )}
     </MainLayout>
   );
 }

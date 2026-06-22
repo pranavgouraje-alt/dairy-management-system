@@ -122,6 +122,13 @@ function Reports() {
           </div>
         </Link>
 
+        <Link to="/print-all-bills" className="report-link">
+          <div className="report-card">
+            <h3>🖨️ Print  Bills</h3>
+            <p>Print all member bills for selected cycle</p>
+          </div>
+        </Link>
+
       </div>
 
     </MainLayout>
