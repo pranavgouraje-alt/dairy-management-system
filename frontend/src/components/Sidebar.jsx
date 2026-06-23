@@ -25,11 +25,16 @@ function Sidebar() {
           <Link to="/ratemaster">RateMaster</Link>
         </li>
 
-         <li>
+        <li>
           <Link to="/advance-management">AdvanceManagement</Link>
         </li>
-         <li>
+        <li>
           <Link to="/feed-Management">FeedManagement</Link>
+        </li>
+        <li>
+          <Link to="/backup">
+            Backup
+          </Link>
         </li>
       </ul>
     </div>

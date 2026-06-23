@@ -17,6 +17,7 @@ import FeedAdvanceReport from "../pages/FeedAdvancerRport";
 import BillHistory from "../pages/BillHistory";
 import ReserveReport from "../pages/reserveReport";
 import PrintAllBills from "../pages/PrintAllBills";
+import BackupRestore from "../pages/BackupRestore";
 
 function AppRoutes() {
   return (
@@ -38,6 +39,7 @@ function AppRoutes() {
       <Route path="/bill-history" element={<BillHistory />} />
        <Route path="/reserve-report" element={<ReserveReport />} />
        <Route path="/print-all-bills"element={<PrintAllBills />}/>
+       <Route path="/backup"element={<BackupRestore />}/>
        
 
 
