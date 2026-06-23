@@ -1,0 +1,40 @@
+.member-form,
+.collection-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.member-form input,
+.member-form select,
+.collection-form input,
+.collection-form select {
+  padding: 10px 14px;
+  min-width: 180px;
+  border: 1px solid #cfd8dc;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  background: white;
+}
+
+.member-form input:focus,
+.member-form select:focus,
+.collection-form input:focus,
+.collection-form select:focus,
+.search-box:focus {
+  border-color: var(--primary);
+}
+
+.search-box {
+  width: 300px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  border: 1px solid #cfd8dc;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  outline: none;
+}

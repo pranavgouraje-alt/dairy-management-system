@@ -1,0 +1,85 @@
+.pro-card {
+  background: white;
+  border-radius: 20px;
+  padding: 22px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 8px 25px rgba(15, 23, 42, 0.08);
+  transition: all 0.3s ease;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  overflow: hidden;
+}
+
+.pro-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.14);
+}
+
+.pro-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+}
+
+.pro-card.blue::before {
+  background: linear-gradient(135deg, #1976d2, #42a5f5);
+}
+
+.pro-card.green::before {
+  background: linear-gradient(135deg, #2e7d32, #66bb6a);
+}
+
+.pro-card.orange::before {
+  background: linear-gradient(135deg, #f57c00, #ffb74d);
+}
+
+.pro-card.purple::before {
+  background: linear-gradient(135deg, #6a1b9a, #ab47bc);
+}
+
+.pro-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  z-index: 1;
+}
+
+.pro-card-content {
+  z-index: 1;
+}
+
+.pro-card-content p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.pro-card-content h2 {
+  margin: 6px 0;
+  font-size: 28px;
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.pro-card-content span {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.pro-card-unit {
+  margin-left: 5px;
+  font-size: 15px !important;
+  color: #64748b !important;
+}

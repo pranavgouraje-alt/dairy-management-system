@@ -1,0 +1,21 @@
+.dashboard-pro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 22px;
+  margin-bottom: 28px;
+}
+
+.dashboard-section {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  margin-top: 26px;
+  box-shadow: 0 8px 25px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.dashboard-section h2 {
+  margin-top: 0;
+  color: #0f172a;
+  font-size: 22px;
+}

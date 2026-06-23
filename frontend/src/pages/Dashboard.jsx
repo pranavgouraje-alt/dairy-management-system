@@ -1,73 +1,224 @@
 import { useEffect, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
 import DashboardCard from "../components/DashboardCard";
-import { formatAmount }
-from "../utils/amountUtils";
+import { formatAmount } from "../utils/amountUtils";
 
 function Dashboard() {
   const [collections, setCollections] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [billRecords, setBillRecords] = useState([]);
 
   useEffect(() => {
     const savedCollections = localStorage.getItem("collections");
+    const savedMembers = localStorage.getItem("members");
+    const savedBills = localStorage.getItem("billRecords");
+
     if (savedCollections) {
       setCollections(JSON.parse(savedCollections));
+    }
+
+    if (savedMembers) {
+      setMembers(JSON.parse(savedMembers));
+    }
+
+    if (savedBills) {
+      setBillRecords(JSON.parse(savedBills));
     }
   }, []);
 
   const today = new Date().toISOString().split("T")[0];
-  const todayCollections = collections.filter((c) => c.collectionDate === today);
 
-  const totalMilk = todayCollections.reduce((t, c) => t + Number(c.quantity), 0);
-  const totalAmount = todayCollections.reduce((t, c) => t + Number(c.amount), 0);
-  const cowMilk = todayCollections.filter((c) => c.milkType === "Cow").reduce((t, c) => t + Number(c.quantity), 0);
-  const buffaloMilk = todayCollections.filter((c) => c.milkType === "Buffalo").reduce((t, c) => t + Number(c.quantity), 0);
-  const morningMilk = todayCollections.filter((c) => c.session === "Morning").reduce((t, c) => t + Number(c.quantity), 0);
-  const eveningMilk = todayCollections.filter((c) => c.session === "Evening").reduce((t, c) => t + Number(c.quantity), 0);
+  const todayCollections = collections.filter(
+    (collection) => collection.collectionDate === today
+  );
+
+  const totalMilk = todayCollections.reduce(
+    (total, collection) =>
+      total + Number(collection.quantity || 0),
+    0
+  );
+
+  const totalAmount = todayCollections.reduce(
+    (total, collection) =>
+      total + Number(collection.amount || 0),
+    0
+  );
+
+  const cowMilk = todayCollections
+    .filter((collection) => collection.milkType === "Cow")
+    .reduce(
+      (total, collection) =>
+        total + Number(collection.quantity || 0),
+      0
+    );
+
+  const buffaloMilk = todayCollections
+    .filter((collection) => collection.milkType === "Buffalo")
+    .reduce(
+      (total, collection) =>
+        total + Number(collection.quantity || 0),
+      0
+    );
+
+  const morningMilk = todayCollections
+    .filter((collection) => collection.session === "Morning")
+    .reduce(
+      (total, collection) =>
+        total + Number(collection.quantity || 0),
+      0
+    );
+
+  const eveningMilk = todayCollections
+    .filter((collection) => collection.session === "Evening")
+    .reduce(
+      (total, collection) =>
+        total + Number(collection.quantity || 0),
+      0
+    );
+
+  const recentCollections = [...todayCollections]
+    .reverse()
+    .slice(0, 5);
 
   const todayDisplay = new Date().toLocaleDateString("en-IN", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
   return (
     <MainLayout>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "28px", flexWrap: "wrap", gap: "12px" }}>
+      <div className="dashboard-header">
         <div>
-          <h1 style={{ fontSize: "26px", fontWeight: "800", color: "#0d1b2a", margin: "0 0 4px 0" }}>
+          <h1 className="dashboard-title">
             Dairy Dashboard
           </h1>
-          <p style={{ fontSize: "13px", color: "#78909c", margin: 0, fontWeight: "600" }}>{todayDisplay}</p>
+
+          <p className="dashboard-date">
+            {todayDisplay}
+          </p>
         </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: "8px",
-          background: "#e8f5e9", color: "#2e7d32", fontSize: "13px",
-          fontWeight: "700", padding: "8px 16px", borderRadius: "20px",
-          border: "1px solid #a5d6a7",
-        }}>
-          <span style={{
-            width: "8px", height: "8px", borderRadius: "50%",
-            background: "#43a047", display: "inline-block",
-            animation: "pulse 1.5s infinite",
-          }} />
+
+        <div className="dashboard-badge">
+          <span className="live-dot"></span>
           Live Today
         </div>
       </div>
 
-      {/* Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "20px",
-        }}
-      >
-        <DashboardCard title="Total Milk"      value={totalMilk}              unit="L"  icon="🥛" accent="#1976d2" highlight />
-        <DashboardCard title="Total Amount"   value={`₹${formatAmount(totalAmount)}`}            icon="💰" accent="#2e7d32" highlight />
-        <DashboardCard title="Entries Today"   value={todayCollections.length}        icon="📋" accent="#6a1b9a" />
-        <DashboardCard title="Cow Milk"        value={cowMilk}                unit="L"  icon="🐄" accent="#f57c00" />
-        <DashboardCard title="Buffalo Milk"    value={buffaloMilk}            unit="L"  icon="🐃" accent="#00838f" />
-        <DashboardCard title="Morning Session" value={morningMilk}            unit="L"  icon="🌅" accent="#ef6c00" />
-        <DashboardCard title="Evening Session" value={eveningMilk}            unit="L"  icon="🌙" accent="#283593" />
+      <div className="dashboard-pro-grid">
+        <DashboardCard
+          title="Total Milk"
+          value={formatAmount(totalMilk)}
+          unit="L"
+          icon="🥛"
+          variant="blue"
+          subtitle="Today's collection"
+        />
+
+        <DashboardCard
+          title="Total Amount"
+          value={`₹${formatAmount(totalAmount)}`}
+          icon="💰"
+          variant="green"
+          subtitle="Today's milk value"
+        />
+
+        <DashboardCard
+          title="Entries Today"
+          value={todayCollections.length}
+          icon="📋"
+          variant="purple"
+          subtitle="Milk entries"
+        />
+
+        <DashboardCard
+          title="Total Members"
+          value={members.length}
+          icon="👥"
+          variant="orange"
+          subtitle="Registered members"
+        />
+
+        <DashboardCard
+          title="Cow Milk"
+          value={formatAmount(cowMilk)}
+          unit="L"
+          icon="🐄"
+          variant="orange"
+          subtitle="Cow collection"
+        />
+
+        <DashboardCard
+          title="Buffalo Milk"
+          value={formatAmount(buffaloMilk)}
+          unit="L"
+          icon="🐃"
+          variant="blue"
+          subtitle="Buffalo collection"
+        />
+
+        <DashboardCard
+          title="Morning Session"
+          value={formatAmount(morningMilk)}
+          unit="L"
+          icon="🌅"
+          variant="green"
+          subtitle="Morning milk"
+        />
+
+        <DashboardCard
+          title="Evening Session"
+          value={formatAmount(eveningMilk)}
+          unit="L"
+          icon="🌙"
+          variant="purple"
+          subtitle="Evening milk"
+        />
+
+        <DashboardCard
+          title="Generated Bills"
+          value={billRecords.length}
+          icon="🧾"
+          variant="green"
+          subtitle="Total bill records"
+        />
+      </div>
+
+      <div className="dashboard-section">
+        <h2>Recent Collection Activity</h2>
+
+        <table className="member-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Milk Type</th>
+              <th>Session</th>
+              <th>Quantity</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {recentCollections.length === 0 ? (
+              <tr>
+                <td colSpan="5">
+                  No collection entries today
+                </td>
+              </tr>
+            ) : (
+              recentCollections.map((item) => (
+                <tr key={item.collectionId}>
+                  <td>{item.memberName}</td>
+                  <td>{item.milkType}</td>
+                  <td>{item.session}</td>
+                  <td>{formatAmount(item.quantity)} L</td>
+                  <td>₹{formatAmount(item.amount)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </MainLayout>
   );

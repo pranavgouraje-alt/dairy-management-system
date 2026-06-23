@@ -1,0 +1,51 @@
+button {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-primary,
+.collection-form button,
+.member-form button {
+  padding: 10px 22px;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.btn-primary:hover,
+.collection-form button:hover,
+.member-form button:hover {
+  background: var(--primary-dark);
+}
+
+.generate-bill-btn {
+  margin-top: 20px;
+  background: var(--success);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: var(--radius-md);
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.generate-bill-btn:hover {
+  background: #1b5e20;
+}
+
+.print-bill-btn {
+  margin-top: 20px;
+  padding: 14px 24px;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+}
+
+.print-bill-btn:hover {
+  background: var(--primary-dark);
+}

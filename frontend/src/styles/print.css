@@ -1,0 +1,40 @@
+@media print{
+
+@page{
+    size:A4 landscape;
+    margin:6mm;
+}
+
+body *{
+    visibility:hidden;
+}
+
+.print-area,
+.print-area *,
+.print-all-area,
+.print-all-area *{
+    visibility:visible;
+}
+
+.print-area,
+.print-all-area{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+}
+
+.sidebar,
+.navbar,
+.collection-form,
+.generate-bill-btn,
+.print-bill-btn,
+.no-print{
+    display:none !important;
+}
+
+.single-print-bill{
+    page-break-after:always;
+}
+
+}

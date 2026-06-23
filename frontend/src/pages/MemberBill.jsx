@@ -571,7 +571,9 @@ function MemberBill() {
 
               <div className="bill-session-container">
                 <div className="bill-session-box">
-                  <h3>Morning</h3>
+                  <h3 className="bill-session-title">
+                    Morning
+                  </h3>
                   {renderTable(cowMorningCollections)}
                 </div>
 
