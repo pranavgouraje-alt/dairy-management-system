@@ -31,6 +31,12 @@ function Sidebar() {
         <li>
           <Link to="/feed-Management">FeedManagement</Link>
         </li>
+
+         <li>
+          <Link to="/analytics">
+            Analytics
+          </Link>
+        </li>
         <li>
           <Link to="/backup">
             Backup

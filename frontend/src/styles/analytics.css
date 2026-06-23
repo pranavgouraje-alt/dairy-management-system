@@ -1,0 +1,68 @@
+.analytics-grid{
+display:grid;
+grid-template-columns:
+repeat(auto-fit,minmax(250px,1fr));
+gap:20px;
+margin-bottom:30px;
+}
+
+.analytics-card{
+background:white;
+padding:25px;
+border-radius:20px;
+box-shadow:0 8px 20px rgba(0,0,0,.08);
+}
+
+.analytics-card h3{
+color:#64748b;
+margin-bottom:10px;
+}
+
+.analytics-card h2{
+font-size:32px;
+color:#0f172a;
+}
+
+.chart-card{
+background:white;
+padding:25px;
+border-radius:20px;
+box-shadow:0 8px 20px rgba(0,0,0,.08);
+}
+
+.simple-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  height: 260px;
+  margin-top: 25px;
+}
+
+.simple-chart-item {
+  flex: 1;
+  text-align: center;
+}
+
+.simple-chart-bar-wrap {
+  height: 190px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.simple-chart-bar {
+  width: 38px;
+  background: linear-gradient(180deg, #42a5f5, #1976d2);
+  border-radius: 12px 12px 0 0;
+}
+
+.simple-chart-item strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+}
+
+.simple-chart-item span {
+  color: #64748b;
+  font-weight: 700;
+}

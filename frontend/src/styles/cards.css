@@ -1,72 +1,52 @@
+.dashboard-pro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
 .pro-card {
   background: white;
-  border-radius: 20px;
-  padding: 22px;
+  border-radius: 18px;
+  padding: 20px;
+  min-height: 125px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 8px 25px rgba(15, 23, 42, 0.08);
-  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
   border: 1px solid #e5e7eb;
   position: relative;
   overflow: hidden;
 }
 
-.pro-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.14);
-}
-
-.pro-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.08;
-}
-
-.pro-card.blue::before {
-  background: linear-gradient(135deg, #1976d2, #42a5f5);
-}
-
-.pro-card.green::before {
-  background: linear-gradient(135deg, #2e7d32, #66bb6a);
-}
-
-.pro-card.orange::before {
-  background: linear-gradient(135deg, #f57c00, #ffb74d);
-}
-
-.pro-card.purple::before {
-  background: linear-gradient(135deg, #6a1b9a, #ab47bc);
-}
-
 .pro-card-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  width: 54px;
+  height: 54px;
+  min-width: 54px;
+  border-radius: 16px;
   background: #f1f5f9;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 28px;
   z-index: 1;
 }
 
 .pro-card-content {
   z-index: 1;
+  min-width: 0;
 }
 
 .pro-card-content p {
-  margin: 0;
+  margin: 0 0 6px;
   color: #64748b;
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
 }
 
 .pro-card-content h2 {
-  margin: 6px 0;
+  margin: 0;
   font-size: 28px;
   color: #0f172a;
   font-weight: 900;
@@ -81,5 +61,47 @@
 .pro-card-unit {
   margin-left: 5px;
   font-size: 15px !important;
+}
+
+/* ================= SUMMARY CARDS USED IN REPORT PAGES ================= */
+
+.session-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)) !important;
+  gap: 20px !important;
+  margin: 24px 0 30px !important;
+  align-items: stretch !important;
+}
+
+.session-summary-card {
+  background: #ffffff !important;
+  border-radius: 18px !important;
+  padding: 22px 24px !important;
+  box-shadow: 0 8px 25px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #e5e7eb !important;
+  border-top: 4px solid #1976d2 !important;
+  min-height: 135px !important;
+}
+
+.session-summary-card h3 {
+  margin: 0 0 10px !important;
   color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+}
+
+.session-summary-card h2 {
+  margin: 0 0 6px !important;
+  color: #0f172a !important;
+  font-size: 30px !important;
+  font-weight: 900 !important;
+}
+
+.session-summary-card p {
+  margin: 0 !important;
+  color: #64748b !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
 }

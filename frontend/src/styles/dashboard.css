@@ -19,3 +19,9 @@
   color: #0f172a;
   font-size: 22px;
 }
+.dashboard-cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:20px;
+    align-items:start;
+}
