@@ -1,17 +1,82 @@
 .navbar {
-  background: linear-gradient(135deg, #1565c0 0%, #1976d2 60%, #42a5f5 100%);
+  height: 72px;
+  background: linear-gradient(135deg, #1565c0, #42a5f5);
   color: white;
   padding: 0 28px;
-  height: 64px;
   display: flex;
   align-items: center;
-  font-size: 22px;
-  font-weight: 800;
-  font-family: 'Poppins', sans-serif;
-  letter-spacing: 0.3px;
-  box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
+  justify-content: space-between;
 }
 
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.nav-left h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.sidebar-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-search {
+  width: 260px;
+  height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  outline: none;
+}
+
+.nav-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  cursor: pointer;
+}
+
+.profile-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.2);
+  padding: 8px 14px;
+  border-radius: 16px;
+}
+
+.profile-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: white;
+  color: #1976d2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
 .layout-container {
   display: flex;
   min-height: calc(100vh - 64px);
@@ -61,4 +126,33 @@
   padding: 32px 36px;
   background: var(--bg-main);
   overflow-y: auto;
+}
+.dark-mode {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.dark-mode .content {
+  background: #0f172a;
+}
+
+.dark-mode .sidebar {
+  background: #111827;
+}
+
+.dark-mode .pro-card,
+.dark-mode .dashboard-section,
+.dark-mode .report-card,
+.dark-mode .member-table,
+.dark-mode .session-summary-card {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode p,
+.dark-mode td {
+  color: #f8fafc;
 }

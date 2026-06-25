@@ -12,19 +12,17 @@ function BackupRestore() {
     "billRecords",
   ];
 
-  const getDataCount = (key) => {
+  function getDataCount(key) {
     const data = localStorage.getItem(key);
 
-    if (!data) {
-      return 0;
-    }
+    if (!data) return 0;
 
     try {
       return JSON.parse(data).length || 0;
     } catch {
       return 0;
     }
-  };
+  }
 
   const [summary, setSummary] = useState(
     storageKeys.map((key) => ({
@@ -80,24 +78,19 @@ function BackupRestore() {
   function restoreBackup(e) {
     const file = e.target.files[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     const confirmRestore = window.confirm(
       "Restoring backup will replace current data. Continue?"
     );
 
-    if (!confirmRestore) {
-      return;
-    }
+    if (!confirmRestore) return;
 
     const reader = new FileReader();
 
     reader.onload = function (event) {
       try {
         const backup = JSON.parse(event.target.result);
-
         const data = backup.data || backup;
 
         storageKeys.forEach((key) => {
@@ -108,9 +101,7 @@ function BackupRestore() {
         });
 
         alert("Backup restored successfully");
-
         refreshSummary();
-
         window.location.reload();
       } catch {
         alert("Invalid backup file");
@@ -125,75 +116,98 @@ function BackupRestore() {
       "Are you sure? This will delete all dairy data."
     );
 
-    if (!confirmReset) {
-      return;
-    }
+    if (!confirmReset) return;
 
     storageKeys.forEach((key) => {
       localStorage.removeItem(key);
     });
 
     alert("All data deleted");
-
     refreshSummary();
-
     window.location.reload();
   }
 
   return (
     <MainLayout>
-      <h1>Backup & Restore</h1>
+      <div className="backup-page">
+        <div className="backup-hero">
+          <div>
+            <h1>Backup & Restore</h1>
+            <p>
+              Export, restore, and protect your complete dairy data.
+            </p>
+          </div>
 
-      <div className="dashboard-cards">
-        <div className="card">
-          <h3>Download Backup</h3>
-          <p>Export full dairy data as JSON file</p>
-
-          <button onClick={downloadBackup}>
-            Download Backup
-          </button>
+          <div className="backup-badge">
+            💾 Data Safety
+          </div>
         </div>
 
-        <div className="card">
-          <h3>Restore Backup</h3>
-          <p>Import previously downloaded backup</p>
+        <div className="backup-action-grid">
+          <div className="backup-card">
+            <div className="backup-icon green">⬇️</div>
+            <h3>Download Backup</h3>
+            <p>Export full dairy data as a JSON backup file.</p>
 
-          <input
-            type="file"
-            accept=".json"
-            onChange={restoreBackup}
-          />
+            <button
+              className="backup-btn green-btn"
+              onClick={downloadBackup}
+            >
+              Download Backup
+            </button>
+          </div>
+
+          <div className="backup-card">
+            <div className="backup-icon blue">⬆️</div>
+            <h3>Restore Backup</h3>
+            <p>Import a previously downloaded backup file.</p>
+
+            <label className="backup-file-btn">
+              Choose Backup File
+              <input
+                type="file"
+                accept=".json"
+                onChange={restoreBackup}
+              />
+            </label>
+          </div>
+
+          <div className="backup-card danger-card">
+            <div className="backup-icon red">🗑️</div>
+            <h3>Reset Data</h3>
+            <p>Delete all local dairy records permanently.</p>
+
+            <button
+              className="backup-btn red-btn"
+              onClick={resetAllData}
+            >
+              Delete All Data
+            </button>
+          </div>
         </div>
 
-        <div className="card">
-          <h3>Reset Data</h3>
-          <p>Delete all local dairy records</p>
+        <div className="backup-summary-box">
+          <h2>Backup Summary</h2>
 
-          <button onClick={resetAllData}>
-            Delete All Data
-          </button>
+          <table className="member-table">
+            <thead>
+              <tr>
+                <th>Data Section</th>
+                <th>Total Records</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {summary.map((item) => (
+                <tr key={item.name}>
+                  <td>{item.name}</td>
+                  <td>{item.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <h2>Backup Summary</h2>
-
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Data Section</th>
-            <th>Total Records</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {summary.map((item) => (
-            <tr key={item.name}>
-              <td>{item.name}</td>
-              <td>{item.count}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </MainLayout>
   );
 }

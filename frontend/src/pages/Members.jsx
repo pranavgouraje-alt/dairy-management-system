@@ -1,182 +1,185 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
+import DataTable from "../components/DataTable";
+import StatusBadge from "../components/StatusBadge";
 
 function Members() {
-
-  const [formData, setFormData] = useState({
+  const emptyForm = {
     memberId: "",
     name: "",
     mobile: "",
     village: "",
-    status: "Active"
-  });
+    status: "Active",
+  };
 
+  const [formData, setFormData] = useState(emptyForm);
   const [members, setMembers] = useState([]);
+  const [editId, setEditId] = useState(null);
 
-  const [search, setSearch] = useState("");
-
-  const [editIndex, setEditIndex] = useState(null);
-
-  // Load members from Local Storage when page loads
   useEffect(() => {
-
-    const savedMembers =
-      localStorage.getItem("members");
+    const savedMembers = localStorage.getItem("members");
 
     if (savedMembers) {
-
-      setMembers(
-        JSON.parse(savedMembers)
-      );
-
+      setMembers(JSON.parse(savedMembers));
     }
-
   }, []);
 
-  // Save members whenever members array changes
   useEffect(() => {
-
     localStorage.setItem(
       "members",
       JSON.stringify(members)
     );
-
   }, [members]);
 
   function handleChange(e) {
-
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
+  }
 
+  function clearForm() {
+    setFormData(emptyForm);
+    setEditId(null);
   }
 
   function saveMember() {
-
-    // Required Field Validation
     if (
       !formData.memberId ||
       !formData.name ||
       !formData.mobile
     ) {
-
       alert("Please fill all required fields");
-
       return;
     }
 
-    // Mobile Validation
     if (formData.mobile.length !== 10) {
-
-      alert(
-        "Mobile number must be 10 digits"
-      );
-
+      alert("Mobile number must be 10 digits");
       return;
     }
 
-    // Duplicate Check (only while adding)
-    if (editIndex === null) {
-
-      const duplicateMember =
-        members.find(
-          (member) =>
-            member.memberId ===
-            formData.memberId
-        );
-
-      if (duplicateMember) {
-
-        alert(
-          "Member ID already exists"
-        );
-
-        return;
-      }
-
-    }
-
-    // Edit Existing Member
-    if (editIndex !== null) {
-
-      const updatedMembers =
-        [...members];
-
-      updatedMembers[editIndex] =
-        formData;
-
-      setMembers(updatedMembers);
-
-      setEditIndex(null);
-
-    }
-
-    // Add New Member
-    else {
-
-      setMembers([
-        ...members,
-        formData
-      ]);
-
-    }
-
-    // Reset Form
-    setFormData({
-      memberId: "",
-      name: "",
-      mobile: "",
-      village: "",
-      status: "Active"
-    });
-
-  }
-
-  function editMember(index) {
-
-    setFormData(
-      members[index]
+    const duplicateMember = members.find(
+      (member) =>
+        member.memberId === formData.memberId &&
+        member.memberId !== editId
     );
 
-    setEditIndex(index);
+    if (duplicateMember) {
+      alert("Member ID already exists");
+      return;
+    }
 
+    if (editId) {
+      const updatedMembers = members.map((member) =>
+        member.memberId === editId
+          ? {
+              ...formData,
+              memberId: editId,
+            }
+          : member
+      );
+
+      setMembers(updatedMembers);
+    } else {
+      setMembers([...members, formData]);
+    }
+
+    clearForm();
   }
 
-  function deleteMember(index) {
+  function editMember(member) {
+    setFormData({
+      memberId: member.memberId,
+      name: member.name,
+      mobile: member.mobile,
+      village: member.village,
+      status: member.status,
+    });
 
-    const updatedMembers =
-      members.filter(
-        (_, i) => i !== index
-      );
+    setEditId(member.memberId);
+  }
+
+  function deleteMember(memberId) {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this member?"
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    const updatedMembers = members.filter(
+      (member) => member.memberId !== memberId
+    );
 
     setMembers(updatedMembers);
 
+    if (editId === memberId) {
+      clearForm();
+    }
   }
 
-  const filteredMembers =
-    members.filter((member) =>
-      member.name
-        .toLowerCase()
-        .includes(
-          search.toLowerCase()
-        )
-    );
+  const columns = [
+    {
+      key: "memberId",
+      label: "Member ID",
+    },
+    {
+      key: "name",
+      label: "Member Name",
+    },
+    {
+      key: "mobile",
+      label: "Mobile",
+    },
+    {
+      key: "village",
+      label: "Village",
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <StatusBadge status={row.status} />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      sortable: false,
+      render: (row) => (
+        <div className="table-actions">
+          <button
+            className="table-edit-btn"
+            onClick={() => editMember(row)}
+          >
+            Edit
+          </button>
+
+          <button
+            className="table-delete-btn"
+            onClick={() =>
+              deleteMember(row.memberId)
+            }
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <MainLayout>
-
-      <h1>
-        Members Management
-      </h1>
+      <h1>Members Management</h1>
 
       <div className="member-form">
-
         <input
           name="memberId"
           placeholder="Member ID"
           value={formData.memberId}
           onChange={handleChange}
+          disabled={editId !== null}
         />
 
         <input
@@ -210,121 +213,21 @@ function Members() {
         </select>
 
         <button onClick={saveMember}>
-
-          {
-            editIndex !== null
-              ? "Update Member"
-              : "Add Member"
-          }
-
+          {editId ? "Update Member" : "Add Member"}
         </button>
 
+        {editId && (
+          <button onClick={clearForm}>
+            Cancel
+          </button>
+        )}
       </div>
 
-      <hr />
-
-      <input
-        className="search-box"
-        placeholder="Search Member"
-        value={search}
-        onChange={(e) =>
-          setSearch(e.target.value)
-        }
+      <DataTable
+        columns={columns}
+        data={members}
+        searchPlaceholder="Search members..."
       />
-
-      <table className="member-table">
-
-        <thead>
-
-          <tr>
-
-            <th>ID</th>
-
-            <th>Name</th>
-
-            <th>Mobile</th>
-
-            <th>Village</th>
-
-            <th>Status</th>
-
-            <th>Action</th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          {filteredMembers.map(
-            (member, index) => (
-
-              <tr
-                key={
-                  member.memberId
-                }
-              >
-
-                <td>
-                  {member.memberId}
-                </td>
-
-                <td>
-                  {member.name}
-                </td>
-
-                <td>
-                  {member.mobile}
-                </td>
-
-                <td>
-                  {member.village}
-                </td>
-
-                <td>
-
-                  <span
-                    className={
-                      member.status ===
-                      "Active"
-                        ? "active-badge"
-                        : "inactive-badge"
-                    }
-                  >
-                    {member.status}
-                  </span>
-
-                </td>
-
-                <td>
-
-                  <button
-                    onClick={() =>
-                      editMember(index)
-                    }
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      deleteMember(index)
-                    }
-                  >
-                    Delete
-                  </button>
-
-                </td>
-
-              </tr>
-
-            )
-          )}
-
-        </tbody>
-
-      </table>
-
     </MainLayout>
   );
 }

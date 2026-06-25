@@ -92,7 +92,7 @@ function Reports() {
         {
           title: "Rate Master",
           description: "Manage current and history rates",
-          path: "/ratemaster",
+          path: "/rate-master",
           icon: "📈",
         },
         {

@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
+import StatusBadge from "../components/StatusBadge";
+import DataTable from "../components/DataTable";
+import { formatAmount } from "../utils/amountUtils";
 
 function FeedManagement() {
   const emptyForm = {
@@ -16,6 +19,7 @@ function FeedManagement() {
   const [members, setMembers] = useState([]);
   const [feedData, setFeedData] = useState(emptyForm);
   const [feedRecords, setFeedRecords] = useState([]);
+  const [editId, setEditId] = useState(null);
 
   useEffect(() => {
     const savedMembers = localStorage.getItem("members");
@@ -38,15 +42,22 @@ function FeedManagement() {
   }, [feedRecords]);
 
   function handleChange(e) {
-    const updatedData = {
+    const { name, value } = e.target;
+
+    let updatedData = {
       ...feedData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     };
 
-    if (
-      e.target.name === "quantity" ||
-      e.target.name === "rate"
-    ) {
+    if (name === "memberId") {
+      const member = members.find(
+        (m) => m.memberId === value
+      );
+
+      updatedData.memberName = member ? member.name : "";
+    }
+
+    if (name === "quantity" || name === "rate") {
       updatedData.amount =
         Number(updatedData.quantity || 0) *
         Number(updatedData.rate || 0);
@@ -55,18 +66,9 @@ function FeedManagement() {
     setFeedData(updatedData);
   }
 
-  function findMember(memberId) {
-    const member = members.find(
-      (m) => m.memberId === memberId
-    );
-
-    if (member) {
-      setFeedData((prev) => ({
-        ...prev,
-        memberId,
-        memberName: member.name,
-      }));
-    }
+  function clearForm() {
+    setFeedData(emptyForm);
+    setEditId(null);
   }
 
   function saveFeedRecord() {
@@ -81,27 +83,135 @@ function FeedManagement() {
       return;
     }
 
-    const record = {
-      feedId: Date.now(),
+    const finalData = {
       ...feedData,
+      amount: Number(feedData.amount).toFixed(2),
     };
 
-    setFeedRecords([
-      ...feedRecords,
-      record,
-    ]);
+    if (editId) {
+      const updatedRecords = feedRecords.map((record) =>
+        record.feedId === editId
+          ? {
+              ...finalData,
+              feedId: editId,
+            }
+          : record
+      );
 
-    setFeedData(emptyForm);
+      setFeedRecords(updatedRecords);
+    } else {
+      const newRecord = {
+        feedId: Date.now(),
+        ...finalData,
+      };
+
+      setFeedRecords([
+        ...feedRecords,
+        newRecord,
+      ]);
+    }
+
+    clearForm();
+  }
+
+  function editFeedRecord(record) {
+    setFeedData({
+      memberId: record.memberId,
+      memberName: record.memberName,
+      feedType: record.feedType,
+      quantity: record.quantity,
+      rate: record.rate,
+      amount: record.amount,
+      date: record.date,
+      status: record.status,
+    });
+
+    setEditId(record.feedId);
   }
 
   function deleteFeedRecord(feedId) {
-    const updatedRecords =
-      feedRecords.filter(
-        (record) => record.feedId !== feedId
-      );
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this feed record?"
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    const updatedRecords = feedRecords.filter(
+      (record) => record.feedId !== feedId
+    );
 
     setFeedRecords(updatedRecords);
+
+    if (editId === feedId) {
+      clearForm();
+    }
   }
+
+  const columns = [
+    {
+      key: "memberId",
+      label: "Member ID",
+    },
+    {
+      key: "memberName",
+      label: "Member",
+    },
+    {
+      key: "feedType",
+      label: "Feed Type",
+    },
+    {
+      key: "quantity",
+      label: "Quantity",
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      render: (row) => `₹${formatAmount(row.rate)}`,
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      render: (row) => `₹${formatAmount(row.amount)}`,
+    },
+    {
+      key: "date",
+      label: "Date",
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <StatusBadge status={row.status} />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      sortable: false,
+      render: (row) => (
+        <div className="table-actions">
+          <button
+            className="table-edit-btn"
+            onClick={() => editFeedRecord(row)}
+          >
+            Edit
+          </button>
+
+          <button
+            className="table-delete-btn"
+            onClick={() =>
+              deleteFeedRecord(row.feedId)
+            }
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <MainLayout>
@@ -112,17 +222,14 @@ function FeedManagement() {
           name="memberId"
           placeholder="Member ID"
           value={feedData.memberId}
-          onChange={(e) => {
-            handleChange(e);
-            findMember(e.target.value);
-          }}
+          onChange={handleChange}
         />
 
         <input
           name="memberName"
           placeholder="Member Name"
           value={feedData.memberName}
-          onChange={handleChange}
+          readOnly
         />
 
         <input
@@ -147,7 +254,7 @@ function FeedManagement() {
         />
 
         <input
-          value={feedData.amount}
+          value={formatAmount(feedData.amount)}
           readOnly
           placeholder="Amount"
         />
@@ -166,52 +273,25 @@ function FeedManagement() {
         >
           <option>Unpaid</option>
           <option>Paid</option>
+          <option>Deducted</option>
         </select>
 
         <button onClick={saveFeedRecord}>
-          Save Feed
+          {editId ? "Update Feed" : "Save Feed"}
         </button>
+
+        {editId && (
+          <button onClick={clearForm}>
+            Cancel
+          </button>
+        )}
       </div>
 
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Member ID</th>
-            <th>Name</th>
-            <th>Feed Type</th>
-            <th>Qty</th>
-            <th>Rate</th>
-            <th>Amount</th>
-            <th>Date</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {feedRecords.map((record) => (
-            <tr key={record.feedId}>
-              <td>{record.memberId}</td>
-              <td>{record.memberName}</td>
-              <td>{record.feedType}</td>
-              <td>{record.quantity}</td>
-              <td>₹{record.rate}</td>
-              <td>₹{record.amount}</td>
-              <td>{record.date}</td>
-              <td>{record.status}</td>
-              <td>
-                <button
-                  onClick={() =>
-                    deleteFeedRecord(record.feedId)
-                  }
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        columns={columns}
+        data={feedRecords}
+        searchPlaceholder="Search feed records..."
+      />
     </MainLayout>
   );
 }

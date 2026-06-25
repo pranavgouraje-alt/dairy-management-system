@@ -1,0 +1,97 @@
+.backup-hero {
+  background: linear-gradient(135deg, #1565c0, #42a5f5);
+  color: white;
+  padding: 28px;
+  border-radius: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  box-shadow: 0 12px 35px rgba(25,118,210,.25);
+}
+
+.backup-hero h1 {
+  margin: 0 0 8px;
+  font-size: 34px;
+}
+
+.backup-hero p {
+  margin: 0;
+  opacity: .9;
+}
+
+.backup-badge {
+  background: rgba(255,255,255,.2);
+  padding: 12px 18px;
+  border-radius: 25px;
+  font-weight: 900;
+}
+
+.backup-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+  margin-bottom: 30px;
+}
+
+.backup-card {
+  background: white;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(15,23,42,.08);
+  border: 1px solid #e5e7eb;
+}
+
+.backup-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 16px;
+}
+
+.backup-icon.green { background: #e8f5e9; }
+.backup-icon.blue { background: #e3f2fd; }
+.backup-icon.red { background: #ffebee; }
+
+.backup-card h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.backup-card p {
+  color: #64748b;
+  margin-bottom: 18px;
+}
+
+.backup-btn,
+.backup-file-btn {
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: none;
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.green-btn { background: #2e7d32; }
+.red-btn { background: #c62828; }
+
+.backup-file-btn {
+  background: #1976d2;
+}
+
+.backup-file-btn input {
+  display: none;
+}
+
+.backup-summary-box {
+  background: white;
+  padding: 24px;
+  border-radius: 20px;
+  box-shadow: 0 8px 25px rgba(15,23,42,.08);
+}

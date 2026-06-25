@@ -29,7 +29,7 @@ function AppRoutes() {
       <Route path="/reports" element={<Reports />} />
       <Route path="/advance-management" element={<AdvanceManagement />} />
       <Route path="/feed-management" element={<FeedManagement/>}/>
-      <Route path="/ratemaster" element={<RateMaster />} />
+      <Route path="/rate-master" element={<RateMaster />} />
       <Route path="/daily-report" element={<DailyReport />} />
       <Route path="/collection-register" element={<CollectionRegister />} />
       <Route path="/milk-summary" element={<MilkSummary />} />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
+import DataTable from "../components/DataTable";
 
 function MemberBill() {
   const [members, setMembers] = useState([]);
@@ -445,6 +446,7 @@ function MemberBill() {
     alert(
       `${newBills.length} bills generated / updated successfully`
     );
+    
   }
 
   function renderTable(data) {

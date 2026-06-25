@@ -88,8 +88,17 @@ function Dashboard() {
   });
 
   return (
-    <MainLayout>
+  <MainLayout>
+
+    <div className="dashboard-effects-page">
+
+      <div className="floating-icon icon-one">🥛</div>
+      <div className="floating-icon icon-two">🐄</div>
+      <div className="floating-icon icon-three">🐃</div>
+
+      {/* Header */}
       <div className="dashboard-header">
+
         <div>
           <h1 className="dashboard-title">
             Dairy Dashboard
@@ -104,9 +113,13 @@ function Dashboard() {
           <span className="live-dot"></span>
           Live Today
         </div>
+
       </div>
 
+
+      {/* Cards */}
       <div className="dashboard-pro-grid">
+
         <DashboardCard
           title="Total Milk"
           value={formatAmount(totalMilk)}
@@ -183,12 +196,17 @@ function Dashboard() {
           variant="green"
           subtitle="Total bill records"
         />
+
       </div>
 
+
+      {/* Recent Activity */}
       <div className="dashboard-section">
+
         <h2>Recent Collection Activity</h2>
 
         <table className="member-table">
+
           <thead>
             <tr>
               <th>Member</th>
@@ -200,6 +218,7 @@ function Dashboard() {
           </thead>
 
           <tbody>
+
             {recentCollections.length === 0 ? (
               <tr>
                 <td colSpan="5">
@@ -217,11 +236,17 @@ function Dashboard() {
                 </tr>
               ))
             )}
+
           </tbody>
+
         </table>
+
       </div>
-    </MainLayout>
-  );
+
+    </div>
+
+  </MainLayout>
+);
 }
 
 export default Dashboard;

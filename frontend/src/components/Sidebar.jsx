@@ -21,9 +21,10 @@ function Sidebar() {
         <li>
           <Link to="/reports">Reports</Link>
         </li>
-        <li>
-          <Link to="/ratemaster">RateMaster</Link>
+         <li>
+          <Link to="/rate-master">Rate Master</Link>
         </li>
+       
 
         <li>
           <Link to="/advance-management">AdvanceManagement</Link>

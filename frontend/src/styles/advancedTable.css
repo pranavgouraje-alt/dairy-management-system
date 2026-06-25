@@ -1,0 +1,164 @@
+.advanced-table-card {
+  background: white;
+  padding: 22px;
+  border-radius: 20px;
+  box-shadow: 0 8px 25px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
+  margin-top: 24px;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.search-wrapper {
+  position: relative;
+  max-width: 350px;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.advanced-search {
+  width: 100%;
+  padding: 12px 16px 12px 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  outline: none;
+  font-size: 14px;
+}
+
+.advanced-search:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.12);
+}
+
+.table-count {
+  font-weight: 800;
+  color: #64748b;
+}
+
+.advanced-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.advanced-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 850px;
+}
+
+.advanced-table th {
+  background: #1976d2;
+  color: white;
+  padding: 14px;
+  text-align: left;
+  font-size: 13px;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+}
+
+.advanced-table td {
+  padding: 14px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+}
+
+.advanced-table tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.advanced-table tr:hover td {
+  background: #e3f2fd;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.pagination-row button {
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: #1976d2;
+  color: white;
+  border: none;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pagination-row button:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.status-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-warning {
+  background: #fff8e1;
+  color: #f57c00;
+}
+
+.status-danger {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: #64748b;
+}
+
+.empty-icon {
+  font-size: 46px;
+}
+
+.empty-state h3 {
+  margin: 10px 0 4px;
+  color: #0f172a;
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.table-edit-btn {
+  background: #1976d2;
+  color: white;
+  padding: 7px 12px;
+  border-radius: 8px;
+}
+
+.table-delete-btn {
+  background: #c62828;
+  color: white;
+  padding: 7px 12px;
+  border-radius: 8px;
+}
