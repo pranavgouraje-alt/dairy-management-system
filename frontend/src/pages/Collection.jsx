@@ -467,52 +467,7 @@ function Collection() {
         )}
       </div>
 
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Date</th>
-            <th>Time</th>
-            <th>Type</th>
-            <th>Session</th>
-            <th>Qty</th>
-            <th>Fat</th>
-            <th>SNF</th>
-            <th>Rate</th>
-            <th>Amount</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {filteredCollections.map((collection) => (
-            <tr key={collection.collectionId}>
-              <td>{collection.memberId}</td>
-              <td>{collection.memberName}</td>
-              <td>{collection.collectionDate}</td>
-              <td>{collection.collectionTime}</td>
-              <td>{collection.milkType}</td>
-              <td>{collection.session}</td>
-              <td>{collection.quantity}</td>
-              <td>{collection.fat}</td>
-              <td>{collection.snf}</td>
-              <td>{collection.rate}</td>
-              <td>₹{collection.amount}</td>
-
-              <td>
-                <button onClick={() => editCollection(collection.collectionId)}>
-                  Edit
-                </button>
-
-                <button onClick={() => deleteCollection(collection.collectionId)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+     
     </MainLayout>
   );
 }
