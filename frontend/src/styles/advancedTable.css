@@ -162,3 +162,19 @@
   padding: 7px 12px;
   border-radius: 8px;
 }
+
+@media (max-width: 768px) {
+  .advanced-table-card {
+    padding: 14px;
+  }
+
+  .advanced-table th,
+  .advanced-table td {
+    padding: 12px;
+    white-space: nowrap;
+  }
+
+  .table-actions {
+    flex-wrap: nowrap;
+  }
+}

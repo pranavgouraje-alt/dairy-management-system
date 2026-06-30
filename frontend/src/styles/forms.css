@@ -38,3 +38,18 @@
   font-size: 14px;
   outline: none;
 }
+
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  button {
+    min-height: 44px;
+  }
+
+  .generate-bill-btn,
+  .print-bill-btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}

@@ -156,3 +156,19 @@
 .dark-mode td {
   color: #f8fafc;
 }
+
+/* ========================= MOBILE SIDEBAR FIX ========================= */
+
+@media (max-width: 768px) {
+  .collapsed-sidebar {
+    width: 100%;
+  }
+
+  .collapsed-sidebar .menu-text {
+    display: inline;
+  }
+
+  .sidebar a.active-menu::before {
+    display: none;
+  }
+}
