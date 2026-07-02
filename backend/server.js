@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const memberRoutes = require("./routes/memberRoutes");
+
 const app = express();
 
 app.use(cors());
@@ -10,6 +12,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("Dairy Management Backend is running");
 });
+
+app.use("/api/members", memberRoutes);
 
 const PORT = process.env.PORT || 5000;
 
