@@ -3,6 +3,13 @@ import MainLayout from "../layouts/MainLayout";
 import DataTable from "../components/DataTable";
 import StatusBadge from "../components/StatusBadge";
 
+import {
+  getMembers,
+  addMember,
+  updateMember,
+  deleteMember as deleteMemberApi,
+} from "../services/memberService";
+
 function Members() {
   const emptyForm = {
     memberId: "",
@@ -15,21 +22,30 @@ function Members() {
   const [formData, setFormData] = useState(emptyForm);
   const [members, setMembers] = useState([]);
   const [editId, setEditId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const savedMembers = localStorage.getItem("members");
-
-    if (savedMembers) {
-      setMembers(JSON.parse(savedMembers));
-    }
+    loadMembers();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(
-      "members",
-      JSON.stringify(members)
-    );
-  }, [members]);
+  async function loadMembers() {
+    try {
+      setLoading(true);
+
+      const result = await getMembers();
+
+      if (result.success) {
+        setMembers(result.data);
+      } else {
+        alert(result.message || "Failed to load members");
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleChange(e) {
     setFormData({
@@ -43,12 +59,8 @@ function Members() {
     setEditId(null);
   }
 
-  function saveMember() {
-    if (
-      !formData.memberId ||
-      !formData.name ||
-      !formData.mobile
-    ) {
+  async function saveMember() {
+    if (!formData.memberId || !formData.name || !formData.mobile) {
       alert("Please fill all required fields");
       return;
     }
@@ -58,33 +70,27 @@ function Members() {
       return;
     }
 
-    const duplicateMember = members.find(
-      (member) =>
-        member.memberId === formData.memberId &&
-        member.memberId !== editId
-    );
+    try {
+      let result;
 
-    if (duplicateMember) {
-      alert("Member ID already exists");
-      return;
+      if (editId) {
+        result = await updateMember(editId, formData);
+      } else {
+        result = await addMember(formData);
+      }
+
+      if (!result.success) {
+        alert(result.message || "Operation failed");
+        return;
+      }
+
+      alert(result.message);
+      clearForm();
+      await loadMembers();
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running");
     }
-
-    if (editId) {
-      const updatedMembers = members.map((member) =>
-        member.memberId === editId
-          ? {
-              ...formData,
-              memberId: editId,
-            }
-          : member
-      );
-
-      setMembers(updatedMembers);
-    } else {
-      setMembers([...members, formData]);
-    }
-
-    clearForm();
   }
 
   function editMember(member) {
@@ -99,49 +105,43 @@ function Members() {
     setEditId(member.memberId);
   }
 
-  function deleteMember(memberId) {
+  async function deleteMemberHandler(memberId) {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this member?"
     );
 
-    if (!confirmDelete) {
-      return;
-    }
+    if (!confirmDelete) return;
 
-    const updatedMembers = members.filter(
-      (member) => member.memberId !== memberId
-    );
+    try {
+      const result = await deleteMemberApi(memberId);
 
-    setMembers(updatedMembers);
+      if (!result.success) {
+        alert(result.message || "Delete failed");
+        return;
+      }
 
-    if (editId === memberId) {
-      clearForm();
+      alert(result.message);
+
+      if (editId === memberId) {
+        clearForm();
+      }
+
+      await loadMembers();
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running");
     }
   }
 
   const columns = [
-    {
-      key: "memberId",
-      label: "Member ID",
-    },
-    {
-      key: "name",
-      label: "Member Name",
-    },
-    {
-      key: "mobile",
-      label: "Mobile",
-    },
-    {
-      key: "village",
-      label: "Village",
-    },
+    { key: "memberId", label: "Member ID" },
+    { key: "name", label: "Member Name" },
+    { key: "mobile", label: "Mobile" },
+    { key: "village", label: "Village" },
     {
       key: "status",
       label: "Status",
-      render: (row) => (
-        <StatusBadge status={row.status} />
-      ),
+      render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: "actions",
@@ -158,9 +158,7 @@ function Members() {
 
           <button
             className="table-delete-btn"
-            onClick={() =>
-              deleteMember(row.memberId)
-            }
+            onClick={() => deleteMemberHandler(row.memberId)}
           >
             Delete
           </button>
@@ -216,18 +214,18 @@ function Members() {
           {editId ? "Update Member" : "Add Member"}
         </button>
 
-        {editId && (
-          <button onClick={clearForm}>
-            Cancel
-          </button>
-        )}
+        {editId && <button onClick={clearForm}>Cancel</button>}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={members}
-        searchPlaceholder="Search members..."
-      />
+      {loading ? (
+        <p>Loading members...</p>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={members}
+          searchPlaceholder="Search members..."
+        />
+      )}
     </MainLayout>
   );
 }

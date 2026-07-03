@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("Dairy Management Backend is running");
+  res.send("Dairy Management Backend is running...");
 });
 
 app.use("/api/members", memberRoutes);
