@@ -2,6 +2,14 @@ import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount }
 from "../utils/amountUtils";
+import {
+  getCollections,
+  addCollection,
+  updateCollection,
+  deleteCollection as deleteCollectionApi,
+} from "../services/collectionService";
+
+import { getMembers } from "../services/memberService";
 
 function Collection() {
   const emptyForm = {
@@ -25,35 +33,47 @@ function Collection() {
   const [editId, setEditId] = useState(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
+    loadRateMaster();
+    loadMembers();
+    loadCollections();
+  }, []);
+
+  function loadRateMaster() {
     const savedRates = localStorage.getItem("rateMaster");
 
     if (savedRates) {
       setRateMaster(JSON.parse(savedRates));
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    const savedMembers = localStorage.getItem("members");
+  async function loadMembers() {
+    try {
+      const result = await getMembers();
 
-    if (savedMembers) {
-      setMembers(JSON.parse(savedMembers));
+      if (result.success) {
+        setMembers(result.data);
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for members");
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    const savedCollections = localStorage.getItem("collections");
+  async function loadCollections() {
+    try {
+      const result = await getCollections();
 
-    if (savedCollections) {
-      setCollections(JSON.parse(savedCollections));
+      if (result.success) {
+        setCollections(result.data);
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for collections");
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    localStorage.setItem("collections", JSON.stringify(collections));
-  }, [collections]);
-
-  const filteredCollections = collections.filter(
+   const filteredCollections = collections.filter(
     (collection) =>
       collection.collectionDate === collectionData.collectionDate &&
       collection.session === collectionData.session &&
@@ -156,8 +176,7 @@ function Collection() {
       );
     });
   }
-
-  function saveCollection() {
+  async function saveCollection() {
     if (
       !collectionData.memberId ||
       !collectionData.memberName ||
@@ -184,7 +203,7 @@ function Collection() {
       return;
     }
 
-    if (collectionData.rate === 0) {
+    if (Number(collectionData.rate) === 0) {
       alert("Rate not found");
       return;
     }
@@ -198,32 +217,54 @@ function Collection() {
 
     const record = {
       ...collectionData,
-      collectionId: editId ?? Date.now(),
+
+      collectionId:
+        editId !== null
+          ? editId
+          : Date.now().toString(),
+
       collectionTime:
         editId !== null
-          ? collectionData.collectionTime || new Date().toLocaleTimeString()
+          ? collectionData.collectionTime ||
+            new Date().toLocaleTimeString()
           : new Date().toLocaleTimeString(),
-      updatedTime: editId !== null ? new Date().toLocaleTimeString() : "",
+
+      updatedTime:
+        editId !== null
+          ? new Date().toLocaleTimeString()
+          : "",
     };
 
-    if (editId !== null) {
-      const updatedCollections = collections.map((collection) =>
-        collection.collectionId === editId ? record : collection
-      );
+    try {
+      let result;
 
-      setCollections(updatedCollections);
+      if (editId !== null) {
+        result = await updateCollection(editId, record);
+      } else {
+        result = await addCollection(record);
+      }
+
+      if (!result.success) {
+        alert(result.message || "Operation failed");
+        return;
+      }
+
+      alert(result.message);
+
+      await loadCollections();
+
       setEditId(null);
-    } else {
-      setCollections([...collections, record]);
+
+      setCollectionData({
+        ...emptyForm,
+        collectionDate: new Date().toISOString().split("T")[0],
+      });
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for collections");
     }
-
-    setCollectionData({
-      ...emptyForm,
-      collectionDate: new Date().toISOString().split("T")[0],
-    });
   }
-
-  function editCollection(collectionId) {
+   function editCollection(collectionId) {
     const selectedCollection = collections.find(
       (collection) => collection.collectionId === collectionId
     );
@@ -234,14 +275,40 @@ function Collection() {
     }
   }
 
-  function deleteCollection(collectionId) {
-    const updatedCollections = collections.filter(
-      (collection) => collection.collectionId !== collectionId
+  async function deleteCollection(collectionId) {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this collection?"
     );
 
-    setCollections(updatedCollections);
-  }
+    if (!confirmDelete) {
+      return;
+    }
 
+    try {
+      const result = await deleteCollectionApi(collectionId);
+
+      if (!result.success) {
+        alert(result.message || "Delete failed");
+        return;
+      }
+
+      alert(result.message);
+
+      await loadCollections();
+
+      if (editId === collectionId) {
+        setEditId(null);
+
+        setCollectionData({
+          ...emptyForm,
+          collectionDate: new Date().toISOString().split("T")[0],
+        });
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for collections");
+    }
+  }
   return (
     <MainLayout>
       <h1>Milk Collection</h1>
