@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
 
+import {
+  getRates,
+  addRate,
+  updateRate as updateRateApi,
+  deleteRate as deleteRateApi,
+} from "../services/rateService";
+
 function RateMaster() {
   const emptyForm = {
     milkType: "Cow",
@@ -22,12 +29,9 @@ function RateMaster() {
   const [historyCycle, setHistoryCycle] = useState("1");
 
   useEffect(() => {
-    const savedRates = localStorage.getItem("rateMaster");
-    const savedHistory = localStorage.getItem("rateHistory");
+    loadRates();
 
-    if (savedRates) {
-      setRates(JSON.parse(savedRates));
-    }
+    const savedHistory = localStorage.getItem("rateHistory");
 
     if (savedHistory) {
       setRateHistory(JSON.parse(savedHistory));
@@ -35,12 +39,26 @@ function RateMaster() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("rateMaster", JSON.stringify(rates));
-  }, [rates]);
-
-  useEffect(() => {
-    localStorage.setItem("rateHistory", JSON.stringify(rateHistory));
+    localStorage.setItem(
+      "rateHistory",
+      JSON.stringify(rateHistory)
+    );
   }, [rateHistory]);
+
+  async function loadRates() {
+    try {
+      const result = await getRates();
+
+      if (result.success) {
+        setRates(result.data);
+      } else {
+        alert("Failed to load rates");
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for rates");
+    }
+  }
 
   function getBillingDates(month, cycle) {
     const [year, monthNumber] = month.split("-");
@@ -97,53 +115,50 @@ function RateMaster() {
     setEditId(null);
   }
 
-  function isDuplicateRate() {
-    return rates.some(
-      (item) =>
-        item.milkType === rateForm.milkType &&
-        item.fat === rateForm.fat &&
-        item.snf === rateForm.snf &&
-        item.id !== editId
-    );
-  }
-
-  function saveRate() {
+  async function saveRate() {
     if (!rateForm.fat || !rateForm.snf || !rateForm.rate) {
       alert("Fill all fields");
       return;
     }
 
-    if (isDuplicateRate()) {
-      alert("Rate already exists for this Milk Type, FAT and SNF");
-      return;
-    }
-
     const today = new Date().toISOString().split("T")[0];
 
-    const newRate = {
-      id: Date.now(),
-      ...rateForm,
-      rate: Number(rateForm.rate).toFixed(2),
-      createdDate: today,
-      createdTime: new Date().toLocaleTimeString(),
-    };
+    try {
+      const result = await addRate({
+        milkType: rateForm.milkType,
+        fat: rateForm.fat,
+        snf: rateForm.snf,
+        rate: rateForm.rate,
+      });
 
-    const historyRecord = {
-      historyId: Date.now() + 1,
-      action: "Created",
-      milkType: rateForm.milkType,
-      fat: rateForm.fat,
-      snf: rateForm.snf,
-      oldRate: "-",
-      newRate: Number(rateForm.rate).toFixed(2),
-      changedDate: today,
-      changedTime: new Date().toLocaleTimeString(),
-    };
+      if (!result.success) {
+        alert(result.message || "Rate save failed");
+        return;
+      }
 
-    setRates([...rates, newRate]);
-    setRateHistory([...rateHistory, historyRecord]);
+      const historyRecord = {
+        historyId: Date.now(),
+        action: "Created",
+        milkType: rateForm.milkType,
+        fat: rateForm.fat,
+        snf: rateForm.snf,
+        oldRate: "-",
+        newRate: Number(rateForm.rate).toFixed(2),
+        changedDate: today,
+        changedTime: new Date().toLocaleTimeString(),
+      };
 
-    clearForm();
+      setRateHistory([...rateHistory, historyRecord]);
+
+      alert(result.message);
+
+      clearForm();
+
+      await loadRates();
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for rates");
+    }
   }
 
   function editRate(rate) {
@@ -157,14 +172,9 @@ function RateMaster() {
     });
   }
 
-  function updateRate() {
+  async function updateRate() {
     if (!rateForm.fat || !rateForm.snf || !rateForm.rate) {
       alert("Fill all fields");
-      return;
-    }
-
-    if (isDuplicateRate()) {
-      alert("Rate already exists for this Milk Type, FAT and SNF");
       return;
     }
 
@@ -177,39 +187,45 @@ function RateMaster() {
 
     const today = new Date().toISOString().split("T")[0];
 
-    const historyRecord = {
-      historyId: Date.now(),
-      action: "Updated",
-      milkType: oldRate.milkType,
-      fat: oldRate.fat,
-      snf: oldRate.snf,
-      oldRate: oldRate.rate,
-      newRate: Number(rateForm.rate).toFixed(2),
-      changedDate: today,
-      changedTime: new Date().toLocaleTimeString(),
-    };
+    try {
+      const result = await updateRateApi(editId, {
+        milkType: rateForm.milkType,
+        fat: rateForm.fat,
+        snf: rateForm.snf,
+        rate: rateForm.rate,
+      });
 
-    const updatedRates = rates.map((item) =>
-      item.id === editId
-        ? {
-            ...item,
-            milkType: rateForm.milkType,
-            fat: rateForm.fat,
-            snf: rateForm.snf,
-            rate: Number(rateForm.rate).toFixed(2),
-            updatedDate: today,
-            updatedTime: new Date().toLocaleTimeString(),
-          }
-        : item
-    );
+      if (!result.success) {
+        alert(result.message || "Rate update failed");
+        return;
+      }
 
-    setRates(updatedRates);
-    setRateHistory([...rateHistory, historyRecord]);
+      const historyRecord = {
+        historyId: Date.now(),
+        action: "Updated",
+        milkType: oldRate.milkType,
+        fat: oldRate.fat,
+        snf: oldRate.snf,
+        oldRate: oldRate.rate,
+        newRate: Number(rateForm.rate).toFixed(2),
+        changedDate: today,
+        changedTime: new Date().toLocaleTimeString(),
+      };
 
-    clearForm();
+      setRateHistory([...rateHistory, historyRecord]);
+
+      alert(result.message);
+
+      clearForm();
+
+      await loadRates();
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for rates");
+    }
   }
 
-  function deleteRate(id) {
+  async function deleteRate(id) {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this rate?"
     );
@@ -221,25 +237,41 @@ function RateMaster() {
     const deletedRate = rates.find((item) => item.id === id);
 
     if (!deletedRate) {
+      alert("Rate not found");
       return;
     }
 
     const today = new Date().toISOString().split("T")[0];
 
-    const historyRecord = {
-      historyId: Date.now(),
-      action: "Deleted",
-      milkType: deletedRate.milkType,
-      fat: deletedRate.fat,
-      snf: deletedRate.snf,
-      oldRate: deletedRate.rate,
-      newRate: "-",
-      changedDate: today,
-      changedTime: new Date().toLocaleTimeString(),
-    };
+    try {
+      const result = await deleteRateApi(id);
 
-    setRates(rates.filter((item) => item.id !== id));
-    setRateHistory([...rateHistory, historyRecord]);
+      if (!result.success) {
+        alert(result.message || "Rate delete failed");
+        return;
+      }
+
+      const historyRecord = {
+        historyId: Date.now(),
+        action: "Deleted",
+        milkType: deletedRate.milkType,
+        fat: deletedRate.fat,
+        snf: deletedRate.snf,
+        oldRate: deletedRate.rate,
+        newRate: "-",
+        changedDate: today,
+        changedTime: new Date().toLocaleTimeString(),
+      };
+
+      setRateHistory([...rateHistory, historyRecord]);
+
+      alert(result.message);
+
+      await loadRates();
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for rates");
+    }
   }
 
   return (
@@ -321,8 +353,16 @@ function RateMaster() {
                 <td>{rate.fat}</td>
                 <td>{rate.snf}</td>
                 <td>₹{formatAmount(rate.rate)}</td>
-                <td>{rate.createdDate || "-"}</td>
-                <td>{rate.updatedDate || "-"}</td>
+                <td>
+                  {rate.createdAt
+                    ? rate.createdAt.split("T")[0]
+                    : "-"}
+                </td>
+                <td>
+                  {rate.updatedAt
+                    ? rate.updatedAt.split("T")[0]
+                    : "-"}
+                </td>
                 <td>
                   <button onClick={() => editRate(rate)}>
                     Edit
@@ -346,12 +386,16 @@ function RateMaster() {
         <input
           type="month"
           value={historyMonth}
-          onChange={(e) => setHistoryMonth(e.target.value)}
+          onChange={(e) =>
+            setHistoryMonth(e.target.value)
+          }
         />
 
         <select
           value={historyCycle}
-          onChange={(e) => setHistoryCycle(e.target.value)}
+          onChange={(e) =>
+            setHistoryCycle(e.target.value)
+          }
         >
           <option value="1">Cycle 1: 1 - 10</option>
           <option value="2">Cycle 2: 11 - 20</option>

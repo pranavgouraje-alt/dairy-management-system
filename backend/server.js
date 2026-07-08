@@ -6,6 +6,7 @@ require("dotenv").config();
 
 const memberRoutes = require("./routes/memberRoutes");
 const collectionRoutes = require("./routes/collectionRoutes");
+const rateRoutes=require("./routes/rateRoutes");
 
 console.log("Collection routes loaded");
 
@@ -27,6 +28,7 @@ app.get("/api/test-collections", (req, res) => {
 
 app.use("/api/members", memberRoutes);
 app.use("/api/collections", collectionRoutes);
+app.use("/api/rates",rateRoutes);
 
 const PORT = process.env.PORT || 5000;
 

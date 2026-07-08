@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
-import { formatAmount }
-from "../utils/amountUtils";
+import { formatAmount } from "../utils/amountUtils";
+
 import {
   getCollections,
   addCollection,
@@ -10,6 +10,7 @@ import {
 } from "../services/collectionService";
 
 import { getMembers } from "../services/memberService";
+import { getRates } from "../services/rateService";
 
 function Collection() {
   const emptyForm = {
@@ -33,17 +34,22 @@ function Collection() {
   const [editId, setEditId] = useState(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-    useEffect(() => {
+  useEffect(() => {
     loadRateMaster();
     loadMembers();
     loadCollections();
   }, []);
 
-  function loadRateMaster() {
-    const savedRates = localStorage.getItem("rateMaster");
+  async function loadRateMaster() {
+    try {
+      const result = await getRates();
 
-    if (savedRates) {
-      setRateMaster(JSON.parse(savedRates));
+      if (result.success) {
+        setRateMaster(result.data);
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Backend server is not running for rates");
     }
   }
 
@@ -73,11 +79,13 @@ function Collection() {
     }
   }
 
-   const filteredCollections = collections.filter(
+  const filteredCollections = collections.filter(
     (collection) =>
       collection.collectionDate === collectionData.collectionDate &&
       collection.session === collectionData.session &&
-      collection.memberName.toLowerCase().includes(search.toLowerCase())
+      (collection.memberName || "")
+        .toLowerCase()
+        .includes(search.toLowerCase())
   );
 
   const sessionTotalMilk = filteredCollections.reduce(
@@ -106,7 +114,9 @@ function Collection() {
     .filter((collection) => collection.milkType === "Buffalo")
     .reduce((total, collection) => total + Number(collection.amount), 0);
 
-  const activeMembers = members.filter((member) => member.status !== "Inactive");
+  const activeMembers = members.filter(
+    (member) => member.status !== "Inactive"
+  );
 
   const collectedMemberIds = filteredCollections.map(
     (collection) => collection.memberId
@@ -126,8 +136,8 @@ function Collection() {
     const rateRecord = rateMaster.find(
       (rate) =>
         rate.milkType === milkType &&
-        rate.fat === fat &&
-        rate.snf === snf
+        Number(rate.fat) === Number(fat) &&
+        Number(rate.snf) === Number(snf)
     );
 
     return rateRecord ? Number(rateRecord.rate) : 0;
@@ -146,7 +156,11 @@ function Collection() {
     );
 
     updatedData.rate = rate;
-    updatedData.amount = Number(formatAmount( Number(updatedData.quantity || 0) *Number(rate)));
+
+    updatedData.amount = Number(
+      formatAmount(Number(updatedData.quantity || 0) * Number(rate))
+    );
+
     setCollectionData(updatedData);
   }
 
@@ -176,6 +190,7 @@ function Collection() {
       );
     });
   }
+
   async function saveCollection() {
     if (
       !collectionData.memberId ||
@@ -217,22 +232,12 @@ function Collection() {
 
     const record = {
       ...collectionData,
-
-      collectionId:
-        editId !== null
-          ? editId
-          : Date.now().toString(),
-
+      collectionId: editId !== null ? editId : Date.now().toString(),
       collectionTime:
         editId !== null
-          ? collectionData.collectionTime ||
-            new Date().toLocaleTimeString()
+          ? collectionData.collectionTime || new Date().toLocaleTimeString()
           : new Date().toLocaleTimeString(),
-
-      updatedTime:
-        editId !== null
-          ? new Date().toLocaleTimeString()
-          : "",
+      updatedTime: editId !== null ? new Date().toLocaleTimeString() : "",
     };
 
     try {
@@ -264,7 +269,8 @@ function Collection() {
       alert("Backend server is not running for collections");
     }
   }
-   function editCollection(collectionId) {
+
+  function editCollection(collectionId) {
     const selectedCollection = collections.find(
       (collection) => collection.collectionId === collectionId
     );
@@ -309,6 +315,7 @@ function Collection() {
       alert("Backend server is not running for collections");
     }
   }
+
   return (
     <MainLayout>
       <h1>Milk Collection</h1>
@@ -462,10 +469,7 @@ function Collection() {
           </div>
         ) : (
           filteredCollections.map((collection) => (
-            <div
-              className="compact-entry-card"
-              key={collection.collectionId}
-            >
+            <div className="compact-entry-card" key={collection.collectionId}>
               <div className="compact-member">
                 <div className="member-info">
                   <span className="member-animal-face">
@@ -533,8 +537,6 @@ function Collection() {
           ))
         )}
       </div>
-
-     
     </MainLayout>
   );
 }
