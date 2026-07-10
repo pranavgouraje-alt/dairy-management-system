@@ -1,135 +1,278 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
 import StatusBadge from "../components/StatusBadge";
 import DataTable from "../components/DataTable";
 import { formatAmount } from "../utils/amountUtils";
 
+import { getMembers } from "../services/memberService";
+
+import {
+  getFeedRecords,
+  addFeedRecord,
+  updateFeedRecord,
+  deleteFeedRecord as deleteFeedRecordApi,
+} from "../services/feedService";
+
 function FeedManagement() {
-  const emptyForm = {
+  const createEmptyForm = () => ({
     memberId: "",
     memberName: "",
     feedType: "",
     quantity: "",
     rate: "",
     amount: 0,
-    date: new Date().toISOString().split("T")[0],
+
+    date: new Date()
+      .toISOString()
+      .split("T")[0],
+
     status: "Unpaid",
-  };
+  });
 
   const [members, setMembers] = useState([]);
-  const [feedData, setFeedData] = useState(emptyForm);
+
+  const [feedData, setFeedData] = useState(
+    createEmptyForm()
+  );
+
   const [feedRecords, setFeedRecords] = useState([]);
+
   const [editId, setEditId] = useState(null);
 
+  const [loading, setLoading] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    const savedMembers = localStorage.getItem("members");
-    const savedFeed = localStorage.getItem("feedRecords");
-
-    if (savedMembers) {
-      setMembers(JSON.parse(savedMembers));
-    }
-
-    if (savedFeed) {
-      setFeedRecords(JSON.parse(savedFeed));
-    }
+    loadMembers();
+    loadFeedRecords();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(
-      "feedRecords",
-      JSON.stringify(feedRecords)
-    );
-  }, [feedRecords]);
+  async function loadMembers() {
+    try {
+      const result = await getMembers();
+
+      if (result.success) {
+        setMembers(result.data || []);
+      }
+    } catch (error) {
+      console.error(
+        "Error loading members:",
+        error
+      );
+
+      alert(
+        "Unable to load members. Check whether the backend is running."
+      );
+    }
+  }
+
+  async function loadFeedRecords() {
+    try {
+      setLoading(true);
+
+      const result = await getFeedRecords();
+
+      if (result.success) {
+        setFeedRecords(result.data || []);
+      }
+    } catch (error) {
+      console.error(
+        "Error loading feed records:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to load feed records"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleChange(e) {
     const { name, value } = e.target;
 
-    let updatedData = {
-      ...feedData,
-      [name]: value,
-    };
+    setFeedData((previousData) => {
+      const updatedData = {
+        ...previousData,
+        [name]: value,
+      };
 
-    if (name === "memberId") {
-      const member = members.find(
-        (m) => m.memberId === value
-      );
+      if (
+        name === "quantity" ||
+        name === "rate"
+      ) {
+        updatedData.amount = Number(
+          (
+            Number(updatedData.quantity || 0) *
+            Number(updatedData.rate || 0)
+          ).toFixed(2)
+        );
+      }
 
-      updatedData.memberName = member ? member.name : "";
-    }
+      return updatedData;
+    });
+  }
 
-    if (name === "quantity" || name === "rate") {
-      updatedData.amount =
-        Number(updatedData.quantity || 0) *
-        Number(updatedData.rate || 0);
-    }
+  function handleMemberChange(e) {
+    const memberId = e.target.value;
 
-    setFeedData(updatedData);
+    const selectedMember = members.find(
+      (member) =>
+        String(member.memberId) ===
+        String(memberId)
+    );
+
+    setFeedData((previousData) => ({
+      ...previousData,
+
+      memberId,
+
+      memberName: selectedMember
+        ? selectedMember.name
+        : "",
+    }));
   }
 
   function clearForm() {
-    setFeedData(emptyForm);
+    setFeedData(createEmptyForm());
     setEditId(null);
   }
 
-  function saveFeedRecord() {
-    if (
-      !feedData.memberId ||
-      !feedData.memberName ||
-      !feedData.feedType ||
-      !feedData.quantity ||
-      !feedData.rate
-    ) {
-      alert("Please fill all required fields");
+  function validateForm() {
+    if (!feedData.memberId) {
+      alert("Please select a member");
+      return false;
+    }
+
+    if (!feedData.memberName) {
+      alert("Member name was not found");
+      return false;
+    }
+
+    if (!feedData.feedType.trim()) {
+      alert("Please enter feed type");
+      return false;
+    }
+
+    if (Number(feedData.quantity) <= 0) {
+      alert(
+        "Quantity must be greater than zero"
+      );
+      return false;
+    }
+
+    if (Number(feedData.rate) <= 0) {
+      alert("Rate must be greater than zero");
+      return false;
+    }
+
+    if (!feedData.date) {
+      alert("Please select a date");
+      return false;
+    }
+
+    return true;
+  }
+
+  async function saveFeedRecord() {
+    if (!validateForm()) {
       return;
     }
 
-    const finalData = {
-      ...feedData,
-      amount: Number(feedData.amount).toFixed(2),
+    const record = {
+      memberId: feedData.memberId,
+      memberName: feedData.memberName,
+      feedType: feedData.feedType.trim(),
+
+      quantity: Number(feedData.quantity),
+      rate: Number(feedData.rate),
+      amount: Number(feedData.amount),
+
+      date: feedData.date,
+      status: feedData.status,
     };
 
-    if (editId) {
-      const updatedRecords = feedRecords.map((record) =>
-        record.feedId === editId
-          ? {
-              ...finalData,
-              feedId: editId,
-            }
-          : record
+    try {
+      setSaving(true);
+
+      let result;
+
+      if (editId !== null) {
+        result = await updateFeedRecord(
+          editId,
+          record
+        );
+      } else {
+        result = await addFeedRecord(record);
+      }
+
+      if (!result.success) {
+        alert(
+          result.message ||
+            "Feed operation failed"
+        );
+        return;
+      }
+
+      alert(result.message);
+
+      clearForm();
+
+      await loadFeedRecords();
+    } catch (error) {
+      console.error(
+        "Error saving feed record:",
+        error
       );
 
-      setFeedRecords(updatedRecords);
-    } else {
-      const newRecord = {
-        feedId: Date.now(),
-        ...finalData,
-      };
-
-      setFeedRecords([
-        ...feedRecords,
-        newRecord,
-      ]);
+      alert(
+        error.message ||
+          "Unable to save feed record"
+      );
+    } finally {
+      setSaving(false);
     }
-
-    clearForm();
   }
 
   function editFeedRecord(record) {
+    setEditId(record.feedId);
+
     setFeedData({
-      memberId: record.memberId,
-      memberName: record.memberName,
-      feedType: record.feedType,
-      quantity: record.quantity,
-      rate: record.rate,
-      amount: record.amount,
-      date: record.date,
-      status: record.status,
+      memberId: record.memberId || "",
+      memberName: record.memberName || "",
+      feedType: record.feedType || "",
+
+      quantity:
+        record.quantity !== undefined
+          ? String(record.quantity)
+          : "",
+
+      rate:
+        record.rate !== undefined
+          ? String(record.rate)
+          : "",
+
+      amount: Number(record.amount || 0),
+
+      date:
+        record.date ||
+        new Date()
+          .toISOString()
+          .split("T")[0],
+
+      status: record.status || "Unpaid",
     });
 
-    setEditId(record.feedId);
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
-  function deleteFeedRecord(feedId) {
+  async function deleteFeedRecordHandler(feedId) {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this feed record?"
     );
@@ -138,14 +281,35 @@ function FeedManagement() {
       return;
     }
 
-    const updatedRecords = feedRecords.filter(
-      (record) => record.feedId !== feedId
-    );
+    try {
+      const result =
+        await deleteFeedRecordApi(feedId);
 
-    setFeedRecords(updatedRecords);
+      if (!result.success) {
+        alert(
+          result.message ||
+            "Feed record delete failed"
+        );
+        return;
+      }
 
-    if (editId === feedId) {
-      clearForm();
+      alert(result.message);
+
+      if (editId === feedId) {
+        clearForm();
+      }
+
+      await loadFeedRecords();
+    } catch (error) {
+      console.error(
+        "Error deleting feed record:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to delete feed record"
+      );
     }
   }
 
@@ -169,12 +333,22 @@ function FeedManagement() {
     {
       key: "rate",
       label: "Rate",
-      render: (row) => `₹${formatAmount(row.rate)}`,
+
+      render: (row) => (
+        <span>
+          ₹{formatAmount(row.rate)}
+        </span>
+      ),
     },
     {
       key: "amount",
       label: "Amount",
-      render: (row) => `₹${formatAmount(row.amount)}`,
+
+      render: (row) => (
+        <strong>
+          ₹{formatAmount(row.amount)}
+        </strong>
+      ),
     },
     {
       key: "date",
@@ -183,6 +357,7 @@ function FeedManagement() {
     {
       key: "status",
       label: "Status",
+
       render: (row) => (
         <StatusBadge status={row.status} />
       ),
@@ -191,19 +366,26 @@ function FeedManagement() {
       key: "actions",
       label: "Actions",
       sortable: false,
+
       render: (row) => (
         <div className="table-actions">
           <button
+            type="button"
             className="table-edit-btn"
-            onClick={() => editFeedRecord(row)}
+            onClick={() =>
+              editFeedRecord(row)
+            }
           >
             Edit
           </button>
 
           <button
+            type="button"
             className="table-delete-btn"
             onClick={() =>
-              deleteFeedRecord(row.feedId)
+              deleteFeedRecordHandler(
+                row.feedId
+              )
             }
           >
             Delete
@@ -218,12 +400,30 @@ function FeedManagement() {
       <h1>Feed Management</h1>
 
       <div className="collection-form">
-        <input
+        <select
           name="memberId"
-          placeholder="Member ID"
           value={feedData.memberId}
-          onChange={handleChange}
-        />
+          onChange={handleMemberChange}
+        >
+          <option value="">
+            Select Member
+          </option>
+
+          {members
+            .filter(
+              (member) =>
+                member.status !== "Inactive"
+            )
+            .map((member) => (
+              <option
+                key={member.memberId}
+                value={member.memberId}
+              >
+                {member.memberId} -{" "}
+                {member.name}
+              </option>
+            ))}
+        </select>
 
         <input
           name="memberName"
@@ -240,6 +440,9 @@ function FeedManagement() {
         />
 
         <input
+          type="number"
+          min="0"
+          step="0.01"
           name="quantity"
           placeholder="Quantity"
           value={feedData.quantity}
@@ -247,6 +450,9 @@ function FeedManagement() {
         />
 
         <input
+          type="number"
+          min="0"
+          step="0.01"
           name="rate"
           placeholder="Rate"
           value={feedData.rate}
@@ -271,27 +477,51 @@ function FeedManagement() {
           value={feedData.status}
           onChange={handleChange}
         >
-          <option>Unpaid</option>
-          <option>Paid</option>
-          <option>Deducted</option>
+          <option value="Unpaid">
+            Unpaid
+          </option>
+
+          <option value="Paid">
+            Paid
+          </option>
+
+          <option value="Deducted">
+            Deducted
+          </option>
         </select>
 
-        <button onClick={saveFeedRecord}>
-          {editId ? "Update Feed" : "Save Feed"}
+        <button
+          type="button"
+          onClick={saveFeedRecord}
+          disabled={saving}
+        >
+          {saving
+            ? "Saving..."
+            : editId !== null
+              ? "Update Feed"
+              : "Save Feed"}
         </button>
 
-        {editId && (
-          <button onClick={clearForm}>
+        {editId !== null && (
+          <button
+            type="button"
+            onClick={clearForm}
+            disabled={saving}
+          >
             Cancel
           </button>
         )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={feedRecords}
-        searchPlaceholder="Search feed records..."
-      />
+      {loading ? (
+        <p>Loading feed records...</p>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={feedRecords}
+          searchPlaceholder="Search feed records..."
+        />
+      )}
     </MainLayout>
   );
 }
