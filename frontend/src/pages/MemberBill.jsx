@@ -1,60 +1,117 @@
-import { useState, useEffect } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
-import DataTable from "../components/DataTable";
+
+import { getMembers } from "../services/memberService";
+
+import { getCollections } from "../services/collectionService";
+
+import {
+  generateBill,
+  generateAllBills,
+} from "../services/billService";
 
 function MemberBill() {
   const [members, setMembers] = useState([]);
   const [collections, setCollections] = useState([]);
-  const [feedRecords, setFeedRecords] = useState([]);
-  const [advanceRecords, setAdvanceRecords] = useState([]);
-  const [billRecords, setBillRecords] = useState([]);
 
-  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedMemberId, setSelectedMemberId] =
+    useState("");
 
   const [billMonth, setBillMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
 
-  const [billCycle, setBillCycle] = useState("1");
+  const [billCycle, setBillCycle] =
+    useState("1");
 
+  const [generatedBill, setGeneratedBill] =
+    useState(null);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  /*
+    Loads members from the backend.
+
+    This function is placed before useEffect so
+    ESLint/React Compiler does not report:
+
+    Cannot access variable before it is declared.
+  */
+  async function loadMembers() {
+    try {
+      const result = await getMembers();
+
+      if (result.success) {
+        setMembers(result.data || []);
+      } else {
+        alert(
+          result.message ||
+            "Unable to load members"
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Member loading error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to load members from backend"
+      );
+    }
+  }
+
+  /*
+    Loads collections from the backend.
+  */
+  async function loadCollections() {
+    try {
+      const result =
+        await getCollections();
+
+      if (result.success) {
+        setCollections(result.data || []);
+      } else {
+        alert(
+          result.message ||
+            "Unable to load collections"
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Collection loading error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to load collections from backend"
+      );
+    }
+  }
+
+  /*
+    Runs once when the Member Bill page opens.
+  */
   useEffect(() => {
-    const savedMembers = localStorage.getItem("members");
-    const savedCollections = localStorage.getItem("collections");
-    const savedFeed = localStorage.getItem("feedRecords");
-    const savedAdvance = localStorage.getItem("advanceRecords");
-    const savedBills = localStorage.getItem("billRecords");
-
-    if (savedMembers) {
-      setMembers(JSON.parse(savedMembers));
-    }
-
-    if (savedCollections) {
-      setCollections(JSON.parse(savedCollections));
-    }
-
-    if (savedFeed) {
-      setFeedRecords(JSON.parse(savedFeed));
-    }
-
-    if (savedAdvance) {
-      setAdvanceRecords(JSON.parse(savedAdvance));
-    }
-
-    if (savedBills) {
-      setBillRecords(JSON.parse(savedBills));
-    }
+    loadMembers();
+    loadCollections();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(
-      "billRecords",
-      JSON.stringify(billRecords)
-    );
-  }, [billRecords]);
-
-  function getBillingDates(month, cycle) {
-    const [year, monthNumber] = month.split("-");
+  function getBillingDates(
+    month,
+    cycle
+  ) {
+    const [year, monthNumber] =
+      month.split("-");
 
     let fromDay = "01";
     let toDay = "10";
@@ -73,380 +130,239 @@ function MemberBill() {
         0
       ).getDate();
 
-      toDay = String(lastDay).padStart(2, "0");
+      toDay = String(lastDay).padStart(
+        2,
+        "0"
+      );
     }
 
     return {
-      fromDate: `${year}-${monthNumber}-${fromDay}`,
-      toDate: `${year}-${monthNumber}-${toDay}`,
+      fromDate:
+        `${year}-${monthNumber}-${fromDay}`,
+
+      toDate:
+        `${year}-${monthNumber}-${toDay}`,
     };
   }
 
-  function getFinancialYear(date) {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1;
+  const { fromDate, toDate } =
+    getBillingDates(
+      billMonth,
+      billCycle
+    );
 
-    if (month >= 9) {
-      return `${year}-${year + 1}`;
-    }
+  const selectedMember =
+    members.find(
+      (member) =>
+        String(member.memberId) ===
+        String(selectedMemberId)
+    );
 
-    return `${year - 1}-${year}`;
-  }
+  /*
+    Filters only the selected member's collections
+    from the selected billing period.
+  */
+  const previewCollections =
+    useMemo(() => {
+      return collections.filter(
+        (collection) =>
+          String(collection.memberId) ===
+            String(selectedMemberId) &&
+          collection.collectionDate >=
+            fromDate &&
+          collection.collectionDate <=
+            toDate
+      );
+    }, [
+      collections,
+      selectedMemberId,
+      fromDate,
+      toDate,
+    ]);
 
-  const billingDates = getBillingDates(billMonth, billCycle);
+  const cowMorningCollections =
+    previewCollections.filter(
+      (collection) =>
+        collection.milkType === "Cow" &&
+        collection.session === "Morning"
+    );
 
-  const fromDate = billingDates.fromDate;
-  const toDate = billingDates.toDate;
+  const cowEveningCollections =
+    previewCollections.filter(
+      (collection) =>
+        collection.milkType === "Cow" &&
+        collection.session === "Evening"
+    );
 
-  const selectedMember = members.find(
-    (member) => member.memberId === selectedMemberId
-  );
+  const buffaloMorningCollections =
+    previewCollections.filter(
+      (collection) =>
+        collection.milkType ===
+          "Buffalo" &&
+        collection.session === "Morning"
+    );
 
-  const billCollections = collections.filter(
-    (collection) =>
-      collection.memberId === selectedMemberId &&
-      collection.collectionDate >= fromDate &&
-      collection.collectionDate <= toDate
-  );
+  const buffaloEveningCollections =
+    previewCollections.filter(
+      (collection) =>
+        collection.milkType ===
+          "Buffalo" &&
+        collection.session === "Evening"
+    );
 
-  const cowMorningCollections = billCollections.filter(
-    (collection) =>
-      collection.milkType === "Cow" &&
-      collection.session === "Morning"
-  );
-
-  const cowEveningCollections = billCollections.filter(
-    (collection) =>
-      collection.milkType === "Cow" &&
-      collection.session === "Evening"
-  );
-
-  const buffaloMorningCollections = billCollections.filter(
-    (collection) =>
-      collection.milkType === "Buffalo" &&
-      collection.session === "Morning"
-  );
-
-  const buffaloEveningCollections = billCollections.filter(
-    (collection) =>
-      collection.milkType === "Buffalo" &&
-      collection.session === "Evening"
-  );
-
-  function getMilkTotal(data, milkType) {
+  function getMilkTotal(
+    data,
+    milkType
+  ) {
     return data
-      .filter((collection) => collection.milkType === milkType)
+      .filter(
+        (collection) =>
+          collection.milkType === milkType
+      )
       .reduce(
         (total, collection) =>
-          total + Number(collection.quantity || 0),
+          total +
+          Number(collection.quantity || 0),
         0
       );
   }
 
-  function getAmountTotal(data, milkType) {
+  function getAmountTotal(
+    data,
+    milkType
+  ) {
     return data
-      .filter((collection) => collection.milkType === milkType)
+      .filter(
+        (collection) =>
+          collection.milkType === milkType
+      )
       .reduce(
         (total, collection) =>
-          total + Number(collection.amount || 0),
+          total +
+          Number(collection.amount || 0),
         0
       );
   }
 
-  function calculateDeductions({
-    milkAmount,
-    feedDue,
-    advanceDue,
-  }) {
-    const reserveAmount = Number(
-      (milkAmount * 0.1).toFixed(2)
-    );
+  const cowMilk = getMilkTotal(
+    previewCollections,
+    "Cow"
+  );
 
-    const amountAfterReserve = Number(
-      (milkAmount - reserveAmount).toFixed(2)
-    );
+  const buffaloMilk = getMilkTotal(
+    previewCollections,
+    "Buffalo"
+  );
 
-    const feedDeducted = Number(
-      Math.min(
-        feedDue,
-        Math.max(amountAfterReserve, 0)
-      ).toFixed(2)
-    );
+  const cowAmount = getAmountTotal(
+    previewCollections,
+    "Cow"
+  );
 
-    const amountAfterFeed = Number(
-      (amountAfterReserve - feedDeducted).toFixed(2)
-    );
+  const buffaloAmount = getAmountTotal(
+    previewCollections,
+    "Buffalo"
+  );
 
-    const advanceDeducted = Number(
-      Math.min(
-        advanceDue,
-        Math.max(amountAfterFeed, 0)
-      ).toFixed(2)
-    );
-
-    const netPayable = Number(
-      Math.max(
-        amountAfterFeed - advanceDeducted,
-        0
-      ).toFixed(2)
-    );
-
-    const remainingDue = Number(
-      (
-        feedDue +
-        advanceDue -
-        feedDeducted -
-        advanceDeducted
-      ).toFixed(2)
-    );
-
-    const totalDeduction = Number(
-      (
-        reserveAmount +
-        feedDeducted +
-        advanceDeducted
-      ).toFixed(2)
-    );
-
-    return {
-      reserveAmount,
-      feedDeducted,
-      advanceDeducted,
-      totalDeduction,
-      remainingDue,
-      netPayable,
-    };
-  }
-
-  function getFeedDue(memberId) {
-    const memberFeedRecords = feedRecords.filter(
-      (record) =>
-        record.memberId === memberId &&
-        record.date >= fromDate &&
-        record.date <= toDate &&
-        record.status !== "Deducted"
-    );
-
-    return Number(
-      memberFeedRecords
-        .reduce(
-          (total, record) =>
-            total +
-            Number(
-              record.remainingAmount ??
-              record.amount ??
-              0
-            ),
-          0
-        )
-        .toFixed(2)
-    );
-  }
-
-  function getAdvanceDue(memberId) {
-    const memberAdvanceRecords = advanceRecords.filter(
-      (record) =>
-        record.memberId === memberId &&
-        record.status !== "Cleared"
-    );
-
-    return Number(
-      memberAdvanceRecords
-        .reduce(
-          (total, record) =>
-            total +
-            Number(
-              record.remainingAmount ??
-              record.amount ??
-              0
-            ),
-          0
-        )
-        .toFixed(2)
-    );
-  }
-
-  const cowMilk = getMilkTotal(billCollections, "Cow");
-  const buffaloMilk = getMilkTotal(billCollections, "Buffalo");
-
-  const cowAmount = getAmountTotal(billCollections, "Cow");
-  const buffaloAmount = getAmountTotal(billCollections, "Buffalo");
-
-  const totalMilk = cowMilk + buffaloMilk;
+  const totalMilk = Number(
+    (cowMilk + buffaloMilk).toFixed(2)
+  );
 
   const totalAmount = Number(
     (cowAmount + buffaloAmount).toFixed(2)
   );
 
-  const feedDeduction = getFeedDue(selectedMemberId);
-  const advanceDue = getAdvanceDue(selectedMemberId);
-
-  const singleBillDeductions = calculateDeductions({
-    milkAmount: totalAmount,
-    feedDue: feedDeduction,
-    advanceDue,
-  });
-
-  const reserveAmount = singleBillDeductions.reserveAmount;
-  const feedDeductionApplied = singleBillDeductions.feedDeducted;
-  const advanceDeductionApplied = singleBillDeductions.advanceDeducted;
-  const totalDeduction = singleBillDeductions.totalDeduction;
-  const remainingDue = singleBillDeductions.remainingDue;
-  const netPayable = singleBillDeductions.netPayable;
-
-  const periodCollections = collections.filter(
-    (collection) =>
-      collection.collectionDate >= fromDate &&
-      collection.collectionDate <= toDate
-  );
-
-  const billMemberIds = [
-    ...new Set(
-      periodCollections.map(
-        (collection) => collection.memberId
-      )
-    ),
-  ];
-
-  function createBillRecord(memberId) {
-    const member = members.find(
-      (m) => m.memberId === memberId
-    );
-
-    const memberCollections = periodCollections.filter(
-      (collection) => collection.memberId === memberId
-    );
-
-    const cowMilk = getMilkTotal(memberCollections, "Cow");
-    const buffaloMilk = getMilkTotal(memberCollections, "Buffalo");
-
-    const cowAmount = getAmountTotal(memberCollections, "Cow");
-    const buffaloAmount = getAmountTotal(
-      memberCollections,
-      "Buffalo"
-    );
-
-    const totalMilk = cowMilk + buffaloMilk;
-
-    const milkAmount = Number(
-      (cowAmount + buffaloAmount).toFixed(2)
-    );
-
-    const feedDue = getFeedDue(memberId);
-    const advanceDue = getAdvanceDue(memberId);
-
-    const deductionResult = calculateDeductions({
-      milkAmount,
-      feedDue,
-      advanceDue,
-    });
-
-    return {
-      billId:
-        Date.now() +
-        Math.floor(Math.random() * 100000),
-
-      memberId,
-      memberName: member?.name || "",
-
-      billMonth,
-      billCycle,
-
-      fromDate,
-      toDate,
-
-      totalMilk,
-      cowMilk,
-      buffaloMilk,
-
-      milkAmount,
-      cowAmount,
-      buffaloAmount,
-
-      reserveAmount: deductionResult.reserveAmount,
-
-      feedDue,
-      feedDeducted: deductionResult.feedDeducted,
-
-      advanceDue,
-      advanceDeducted: deductionResult.advanceDeducted,
-
-      totalDeduction: deductionResult.totalDeduction,
-      remainingDue: deductionResult.remainingDue,
-      netPayable: deductionResult.netPayable,
-
-      financialYear: getFinancialYear(fromDate),
-
-      billStatus: "Generated",
-
-      generatedDate: new Date()
-        .toISOString()
-        .split("T")[0],
-
-      generatedTime: new Date().toLocaleTimeString(),
-    };
-  }
-
-  function generateBill() {
+  async function handleGenerateBill() {
     if (!selectedMemberId) {
-      alert("Please select member");
+      alert("Please select a member");
       return;
     }
 
-    if (billCollections.length === 0) {
-      alert("No milk collection found for this bill cycle");
-      return;
-    }
-
-    const billRecord = createBillRecord(selectedMemberId);
-
-    const filteredBills = billRecords.filter(
-      (bill) =>
-        !(
-          bill.memberId === selectedMemberId &&
-          bill.billMonth === billMonth &&
-          bill.billCycle === billCycle
-        )
-    );
-
-    setBillRecords([
-      ...filteredBills,
-      billRecord,
-    ]);
-
-    alert("Bill generated / updated successfully");
-  }
-
-  function generateAllBills() {
-    if (periodCollections.length === 0) {
+    if (
+      previewCollections.length === 0
+    ) {
       alert(
-        "No milk collection found for this billing cycle"
+        "No milk collection found for this member and billing period"
       );
       return;
     }
 
-    const newBills = billMemberIds.map(
-      (memberId) => createBillRecord(memberId)
-    );
+    try {
+      setLoading(true);
 
-    const filteredBills = billRecords.filter(
-      (bill) =>
-        !(
-          bill.billMonth === billMonth &&
-          bill.billCycle === billCycle
-        )
-    );
+      const result = await generateBill({
+        memberId: selectedMemberId,
+        billMonth,
+        billCycle,
+      });
 
-    setBillRecords([
-      ...filteredBills,
-      ...newBills,
-    ]);
+      if (!result.success) {
+        alert(
+          result.message ||
+            "Bill generation failed"
+        );
+        return;
+      }
 
-    alert(
-      `${newBills.length} bills generated / updated successfully`
-    );
-    
+      setGeneratedBill(result.data);
+
+      alert(result.message);
+    } catch (error) {
+      console.error(
+        "Generate bill error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to generate bill"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGenerateAllBills() {
+    const confirmGeneration =
+      window.confirm(
+        "Generate or update all bills for this billing cycle?"
+      );
+
+    if (!confirmGeneration) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const result =
+        await generateAllBills({
+          billMonth,
+          billCycle,
+        });
+
+      if (!result.success) {
+        alert(
+          result.message ||
+            "All bill generation failed"
+        );
+        return;
+      }
+
+      alert(result.message);
+    } catch (error) {
+      console.error(
+        "Generate all bills error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to generate all bills"
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   function renderTable(data) {
@@ -466,17 +382,44 @@ function MemberBill() {
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan="6">No Data</td>
+              <td colSpan="6">
+                No Data
+              </td>
             </tr>
           ) : (
             data.map((collection) => (
-              <tr key={collection.collectionId}>
-                <td>{collection.collectionDate}</td>
-                <td>{collection.quantity}</td>
+              <tr
+                key={
+                  collection.collectionId
+                }
+              >
+                <td>
+                  {
+                    collection.collectionDate
+                  }
+                </td>
+
+                <td>
+                  {collection.quantity}
+                </td>
+
                 <td>{collection.fat}</td>
+
                 <td>{collection.snf}</td>
-                <td>₹{formatAmount(collection.rate)}</td>
-                <td>₹{formatAmount(collection.amount)}</td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    collection.rate
+                  )}
+                </td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    collection.amount
+                  )}
+                </td>
               </tr>
             ))
           )}
@@ -492,18 +435,25 @@ function MemberBill() {
       <div className="collection-form">
         <select
           value={selectedMemberId}
-          onChange={(e) =>
-            setSelectedMemberId(e.target.value)
-          }
+          onChange={(event) => {
+            setSelectedMemberId(
+              event.target.value
+            );
+
+            setGeneratedBill(null);
+          }}
         >
-          <option value="">Select Member</option>
+          <option value="">
+            Select Member
+          </option>
 
           {members.map((member) => (
             <option
               key={member.memberId}
               value={member.memberId}
             >
-              {member.memberId} - {member.name}
+              {member.memberId} -{" "}
+              {member.name}
             </option>
           ))}
         </select>
@@ -511,16 +461,24 @@ function MemberBill() {
         <input
           type="month"
           value={billMonth}
-          onChange={(e) =>
-            setBillMonth(e.target.value)
-          }
+          onChange={(event) => {
+            setBillMonth(
+              event.target.value
+            );
+
+            setGeneratedBill(null);
+          }}
         />
 
         <select
           value={billCycle}
-          onChange={(e) =>
-            setBillCycle(e.target.value)
-          }
+          onChange={(event) => {
+            setBillCycle(
+              event.target.value
+            );
+
+            setGeneratedBill(null);
+          }}
         >
           <option value="1">
             Cycle 1: 1 - 10
@@ -537,16 +495,28 @@ function MemberBill() {
       </div>
 
       <p>
-        <strong>Billing Period:</strong>{" "}
+        <strong>
+          Billing Period:
+        </strong>{" "}
         {fromDate} to {toDate}
       </p>
 
-      <div style={{ marginBottom: "20px" }}>
+      <div
+        style={{
+          marginBottom: "20px",
+        }}
+      >
         <button
+          type="button"
           className="generate-bill-btn"
-          onClick={generateAllBills}
+          onClick={
+            handleGenerateAllBills
+          }
+          disabled={loading}
         >
-          Generate / Update All Bills
+          {loading
+            ? "Processing..."
+            : "Generate / Update All Bills"}
         </button>
       </div>
 
@@ -557,8 +527,10 @@ function MemberBill() {
 
             <p>
               <strong>Member:</strong>{" "}
-              {selectedMember?.memberId} -{" "}
-              {selectedMember?.name}
+              {
+                selectedMember?.memberId
+              }{" "}
+              - {selectedMember?.name}
             </p>
 
             <p>
@@ -573,27 +545,38 @@ function MemberBill() {
 
               <div className="bill-session-container">
                 <div className="bill-session-box">
-                  <h3 className="bill-session-title">
-                    Morning
-                  </h3>
-                  {renderTable(cowMorningCollections)}
+                  <h3>Morning</h3>
+
+                  {renderTable(
+                    cowMorningCollections
+                  )}
                 </div>
 
                 <div className="bill-session-box">
                   <h3>Evening</h3>
-                  {renderTable(cowEveningCollections)}
+
+                  {renderTable(
+                    cowEveningCollections
+                  )}
                 </div>
               </div>
 
               <div className="animal-total">
                 <p>
-                  <strong>Cow Milk:</strong>{" "}
-                  {cowMilk} L
+                  <strong>
+                    Cow Milk:
+                  </strong>{" "}
+                  {formatAmount(cowMilk)} L
                 </p>
 
                 <p>
-                  <strong>Cow Amount:</strong>{" "}
-                  ₹{formatAmount(cowAmount)}
+                  <strong>
+                    Cow Amount:
+                  </strong>{" "}
+                  ₹
+                  {formatAmount(
+                    cowAmount
+                  )}
                 </p>
               </div>
             </div>
@@ -604,93 +587,231 @@ function MemberBill() {
               <div className="bill-session-container">
                 <div className="bill-session-box">
                   <h3>Morning</h3>
-                  {renderTable(buffaloMorningCollections)}
+
+                  {renderTable(
+                    buffaloMorningCollections
+                  )}
                 </div>
 
                 <div className="bill-session-box">
                   <h3>Evening</h3>
-                  {renderTable(buffaloEveningCollections)}
+
+                  {renderTable(
+                    buffaloEveningCollections
+                  )}
                 </div>
               </div>
 
               <div className="animal-total">
                 <p>
-                  <strong>Buffalo Milk:</strong>{" "}
-                  {buffaloMilk} L
+                  <strong>
+                    Buffalo Milk:
+                  </strong>{" "}
+                  {formatAmount(
+                    buffaloMilk
+                  )}{" "}
+                  L
                 </p>
 
                 <p>
-                  <strong>Buffalo Amount:</strong>{" "}
-                  ₹{formatAmount(buffaloAmount)}
+                  <strong>
+                    Buffalo Amount:
+                  </strong>{" "}
+                  ₹
+                  {formatAmount(
+                    buffaloAmount
+                  )}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="bill-final-summary">
-            <h2>Bill Summary</h2>
+            <h2>Preview Summary</h2>
 
             <table className="bill-summary-table">
               <tbody>
                 <tr>
                   <td>Total Milk</td>
-                  <td>{totalMilk} L</td>
+
+                  <td>
+                    {formatAmount(
+                      totalMilk
+                    )}{" "}
+                    L
+                  </td>
                 </tr>
 
                 <tr>
                   <td>Milk Amount</td>
-                  <td>₹{formatAmount(totalAmount)}</td>
-                </tr>
 
-                <tr>
-                  <td>Reserve Amount 10%</td>
-                  <td>₹{formatAmount(reserveAmount)}</td>
-                </tr>
-
-                <tr>
-                  <td>Feed Due</td>
-                  <td>₹{formatAmount(feedDeduction)}</td>
-                </tr>
-
-                <tr>
-                  <td>Feed Deducted</td>
-                  <td>₹{formatAmount(feedDeductionApplied)}</td>
-                </tr>
-
-                <tr>
-                  <td>Advance Due</td>
-                  <td>₹{formatAmount(advanceDue)}</td>
-                </tr>
-
-                <tr>
-                  <td>Advance Deducted</td>
-                  <td>₹{formatAmount(advanceDeductionApplied)}</td>
-                </tr>
-
-                <tr>
-                  <td>Total Deduction</td>
-                  <td>₹{formatAmount(totalDeduction)}</td>
-                </tr>
-
-                <tr>
-                  <td>Remaining Due</td>
-                  <td>₹{formatAmount(remainingDue)}</td>
-                </tr>
-
-                <tr className="net-payable-row">
-                  <td>Net Payable</td>
-                  <td>₹{formatAmount(netPayable)}</td>
+                  <td>
+                    ₹
+                    {formatAmount(
+                      totalAmount
+                    )}
+                  </td>
                 </tr>
               </tbody>
             </table>
 
             <button
+              type="button"
               className="generate-bill-btn"
-              onClick={generateBill}
+              onClick={
+                handleGenerateBill
+              }
+              disabled={loading}
             >
-              Generate / Update This Bill
+              {loading
+                ? "Generating..."
+                : "Generate / Update This Bill"}
             </button>
           </div>
+        </div>
+      )}
+
+      {generatedBill && (
+        <div className="bill-final-summary">
+          <h2>
+            Generated Bill Summary
+          </h2>
+
+          <table className="bill-summary-table">
+            <tbody>
+              <tr>
+                <td>Member</td>
+
+                <td>
+                  {
+                    generatedBill.memberId
+                  }{" "}
+                  -{" "}
+                  {
+                    generatedBill.memberName
+                  }
+                </td>
+              </tr>
+
+              <tr>
+                <td>Total Milk</td>
+
+                <td>
+                  {formatAmount(
+                    generatedBill.totalMilk
+                  )}{" "}
+                  L
+                </td>
+              </tr>
+
+              <tr>
+                <td>Milk Amount</td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.milkAmount
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  Reserve Amount 10%
+                </td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.reserveAmount
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>Feed Due</td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.feedDue
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  Feed Deducted
+                </td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.feedDeducted
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>Advance Due</td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.advanceDue
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  Advance Deducted
+                </td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.advanceDeducted
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  Total Deduction
+                </td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.totalDeduction
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td>Remaining Due</td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.remainingDue
+                  )}
+                </td>
+              </tr>
+
+              <tr className="net-payable-row">
+                <td>Net Payable</td>
+
+                <td>
+                  ₹
+                  {formatAmount(
+                    generatedBill.netPayable
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
     </MainLayout>
