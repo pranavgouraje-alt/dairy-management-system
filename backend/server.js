@@ -26,6 +26,10 @@ const billRoutes = require(
   "./routes/billRoutes"
 );
 
+const reportRoutes = require(
+  "./routes/reportRoutes"
+);
+
 const app = express();
 
 app.use(cors());
@@ -66,6 +70,11 @@ app.use(
 app.use(
   "/api/bills",
   billRoutes
+);
+
+app.use(
+  "/api/reports",
+  reportRoutes
 );
 
 const PORT =
