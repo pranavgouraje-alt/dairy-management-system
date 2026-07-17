@@ -1,38 +1,51 @@
-const API = "http://localhost:5001/api/collections";
+import apiClient, {
+  createQuery,
+} from "./apiClient";
 
-export async function getCollections() {
-  const response = await fetch(API);
-  return await response.json();
+const COLLECTION_API =
+  "/api/collections";
+
+export function getCollections(
+  filters = {}
+) {
+  return apiClient.get(
+    `${COLLECTION_API}${createQuery(
+      filters
+    )}`
+  );
 }
 
-export async function addCollection(collection) {
-  const response = await fetch(API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(collection),
-  });
-
-  return await response.json();
+export function getCollectionById(
+  collectionId
+) {
+  return apiClient.get(
+    `${COLLECTION_API}/${collectionId}`
+  );
 }
 
-export async function updateCollection(collectionId, collection) {
-  const response = await fetch(`${API}/${collectionId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(collection),
-  });
-
-  return await response.json();
+export function addCollection(
+  collectionData
+) {
+  return apiClient.post(
+    COLLECTION_API,
+    collectionData
+  );
 }
 
-export async function deleteCollection(collectionId) {
-  const response = await fetch(`${API}/${collectionId}`, {
-    method: "DELETE",
-  });
+export function updateCollection(
+  collectionId,
+  collectionData
+) {
+  return apiClient.put(
+    `${COLLECTION_API}/${collectionId}`,
+    collectionData
+  );
+}
 
-  return await response.json();
+export function deleteCollection(
+  collectionId
+) {
+  return apiClient.delete(
+    `${COLLECTION_API}/${collectionId}`
+  );
 }

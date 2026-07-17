@@ -3,6 +3,8 @@ import MainLayout from "../layouts/MainLayout";
 import StatusBadge from "../components/StatusBadge";
 import DataTable from "../components/DataTable";
 import { formatAmount } from "../utils/amountUtils";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 
 import { getMembers } from "../services/memberService";
 
@@ -30,6 +32,7 @@ function FeedManagement() {
   });
 
   const [members, setMembers] = useState([]);
+  const [error, setError] = useState("");
 
   const [feedData, setFeedData] = useState(
     createEmptyForm()
@@ -68,28 +71,29 @@ function FeedManagement() {
   }
 
   async function loadFeedRecords() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
+    setError("");
 
-      const result = await getFeedRecords();
+    const result = await getFeedRecords();
 
-      if (result.success) {
-        setFeedRecords(result.data || []);
-      }
-    } catch (error) {
-      console.error(
-        "Error loading feed records:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to load feed records"
-      );
-    } finally {
-      setLoading(false);
+    if (result.success) {
+      setFeedRecords(result.data || []);
     }
+  } catch (error) {
+    console.error(
+      "Feed loading error:",
+      error
+    );
+
+    setError(
+      error.message ||
+        "Unable to load feed records"
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -513,15 +517,23 @@ function FeedManagement() {
         )}
       </div>
 
-      {loading ? (
-        <p>Loading feed records...</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={feedRecords}
-          searchPlaceholder="Search feed records..."
-        />
-      )}
+     {loading ? (
+  <LoadingSpinner
+    message="Loading feed records..."
+  />
+) : error ? (
+  <ErrorCard
+    title="Feed records could not be loaded"
+    message={error}
+    onRetry={loadFeedRecords}
+  />
+) : (
+  <DataTable
+    columns={columns}
+    data={feedRecords}
+    searchPlaceholder="Search feed records..."
+  />
+)}
     </MainLayout>
   );
 }

@@ -1,4 +1,7 @@
+
+@import "./styles/layout.css";
 @import "./styles/reports.css";
+@import "./styles/apiStates.css";
 *{
   margin:0;
   padding:0;

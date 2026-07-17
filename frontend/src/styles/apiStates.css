@@ -1,0 +1,428 @@
+/* =====================================================
+   SHARED API STATES
+===================================================== */
+
+.api-loading-state,
+.api-empty-state,
+.api-error-card {
+  width: 100%;
+  border-radius: 20px;
+}
+
+/* =====================================================
+   LOADING STATE
+===================================================== */
+
+.api-loading-state {
+  min-height: 260px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 18px;
+
+  padding: 38px 24px;
+
+  border: 1px solid
+    var(--api-border, #dbe4ef);
+
+  background:
+    linear-gradient(
+      145deg,
+      var(--api-surface, #ffffff),
+      var(--api-surface-soft, #f8fafc)
+    );
+
+  text-align: center;
+
+  box-shadow:
+    0 12px 32px
+    rgba(15, 23, 42, 0.065);
+}
+
+.api-loading-full-page {
+  min-height: calc(100vh - 190px);
+}
+
+.api-loading-spinner {
+  position: relative;
+
+  width: 70px;
+  height: 70px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.api-loading-spinner::before {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  border: 6px solid #dbeafe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+
+  animation:
+    apiSpinnerRotate 0.85s linear infinite;
+}
+
+.api-loading-spinner span {
+  position: absolute;
+
+  width: 8px;
+  height: 8px;
+
+  border-radius: 50%;
+
+  background: #2563eb;
+
+  animation:
+    apiLoadingPulse 1.2s ease-in-out
+    infinite;
+}
+
+.api-loading-spinner span:nth-child(1) {
+  transform: translateX(-14px);
+  animation-delay: 0s;
+}
+
+.api-loading-spinner span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.api-loading-spinner span:nth-child(3) {
+  transform: translateX(14px);
+  animation-delay: 0.3s;
+}
+
+@keyframes apiSpinnerRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes apiLoadingPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.api-loading-content h3 {
+  margin: 0;
+
+  color:
+    var(--api-text, #0f172a);
+
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.api-loading-content p {
+  margin: 7px 0 0;
+
+  color:
+    var(--api-muted, #64748b);
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* =====================================================
+   EMPTY STATE
+===================================================== */
+
+.api-empty-state {
+  min-height: 300px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 45px 25px;
+
+  border: 1px dashed
+    var(--api-border, #cbd5e1);
+
+  background:
+    linear-gradient(
+      145deg,
+      var(--api-surface, #ffffff),
+      var(--api-surface-soft, #f8fafc)
+    );
+
+  text-align: center;
+}
+
+.api-empty-icon {
+  width: 76px;
+  height: 76px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 22px;
+
+  background: #eff6ff;
+
+  font-size: 37px;
+
+  box-shadow:
+    0 13px 30px
+    rgba(37, 99, 235, 0.11);
+}
+
+.api-empty-state h3 {
+  margin: 20px 0 8px;
+
+  color:
+    var(--api-text, #0f172a);
+
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.api-empty-state p {
+  max-width: 480px;
+
+  margin: 0;
+
+  color:
+    var(--api-muted, #64748b);
+
+  font-size: 13px;
+  line-height: 1.65;
+  font-weight: 600;
+}
+
+.api-empty-state button {
+  min-height: 42px;
+
+  margin-top: 20px;
+  padding: 0 18px;
+
+  border: none;
+  border-radius: 11px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #2563eb,
+      #0284c7
+    );
+
+  color: white;
+
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 10px 23px
+    rgba(37, 99, 235, 0.22);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.api-empty-state button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 14px 29px
+    rgba(37, 99, 235, 0.3);
+}
+
+/* =====================================================
+   ERROR CARD
+===================================================== */
+
+.api-error-card {
+  display: grid;
+  grid-template-columns:
+    auto minmax(0, 1fr) auto;
+
+  align-items: center;
+  gap: 18px;
+
+  padding: 20px;
+
+  border: 1px solid #fecaca;
+  border-left: 5px solid #dc2626;
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff1f2,
+      #ffffff
+    );
+
+  box-shadow:
+    0 12px 30px
+    rgba(190, 18, 60, 0.08);
+}
+
+.api-error-card-compact {
+  padding: 14px 16px;
+}
+
+.api-error-icon {
+  width: 55px;
+  height: 55px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 16px;
+
+  background: #fee2e2;
+
+  font-size: 27px;
+}
+
+.api-error-content h3 {
+  margin: 0;
+
+  color: #991b1b;
+
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.api-error-content p {
+  margin: 6px 0 0;
+
+  color: #7f1d1d;
+
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 600;
+}
+
+.api-error-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+
+  margin-top: 10px;
+
+  color: #9f1239;
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.api-error-help span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.api-error-help span::before {
+  content: "•";
+}
+
+.api-error-retry-button {
+  min-height: 42px;
+
+  padding: 0 17px;
+
+  border: none;
+  border-radius: 11px;
+
+  background: #be123c;
+  color: white;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 9px 21px
+    rgba(190, 18, 60, 0.19);
+
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.api-error-retry-button:hover {
+  transform: translateY(-2px);
+
+  background: #9f1239;
+}
+
+/* =====================================================
+   DARK MODE
+===================================================== */
+
+body.dark-mode {
+  --api-surface: #172033;
+  --api-surface-soft: #1d2940;
+  --api-text: #f8fafc;
+  --api-muted: #94a3b8;
+  --api-border: #2d3a51;
+}
+
+body.dark-mode .api-error-card {
+  border-color: #7f1d1d;
+
+  background:
+    linear-gradient(
+      135deg,
+      #3f1824,
+      #211b29
+    );
+}
+
+body.dark-mode .api-error-content h3 {
+  color: #fda4af;
+}
+
+body.dark-mode .api-error-content p,
+body.dark-mode .api-error-help {
+  color: #fecdd3;
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 700px) {
+  .api-error-card {
+    grid-template-columns: 1fr;
+
+    text-align: center;
+  }
+
+  .api-error-icon {
+    margin: auto;
+  }
+
+  .api-error-help {
+    justify-content: center;
+  }
+
+  .api-error-retry-button {
+    width: 100%;
+  }
+}

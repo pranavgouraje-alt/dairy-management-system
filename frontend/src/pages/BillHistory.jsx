@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 
 function BillHistory() {
   const [billRecords, setBillRecords] = useState([]);
@@ -8,6 +10,8 @@ function BillHistory() {
 
   const [reportType, setReportType] = useState("all");
   const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
 
   const [billMonth, setBillMonth] = useState(
     new Date().toISOString().slice(0, 7)

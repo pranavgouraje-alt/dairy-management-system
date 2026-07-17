@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 
 import {
   getCollections,
@@ -25,7 +27,8 @@ function Collection() {
     amount: 0,
     collectionDate: new Date().toISOString().split("T")[0],
   };
-
+  const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
   const [rateMaster, setRateMaster] = useState([]);
   const [collectionData, setCollectionData] = useState(emptyForm);
   const [collections, setCollections] = useState([]);
@@ -67,17 +70,29 @@ function Collection() {
   }
 
   async function loadCollections() {
-    try {
-      const result = await getCollections();
+  try {
+    setLoading(true);
+    setError("");
 
-      if (result.success) {
-        setCollections(result.data);
-      }
-    } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for collections");
+    const result = await getCollections();
+
+    if (result.success) {
+      setCollections(result.data || []);
     }
+  } catch (error) {
+    console.error(
+      "Collection loading error:",
+      error
+    );
+
+    setError(
+      error.message ||
+        "Unable to load collections"
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   const filteredCollections = collections.filter(
     (collection) =>
@@ -316,229 +331,330 @@ function Collection() {
     }
   }
 
-  return (
-    <MainLayout>
-      <h1>Milk Collection</h1>
+ return (
+  <MainLayout>
+    <h1>Milk Collection</h1>
 
-      <div className="collection-form">
-        <input
-          name="memberId"
-          placeholder="Member ID"
-          value={collectionData.memberId}
-          onChange={(e) => {
-            handleChange(e);
-            findMember(e.target.value);
-          }}
-        />
-
-        <input
-          name="memberName"
-          placeholder="Member Name"
-          value={collectionData.memberName}
-          onChange={handleChange}
-        />
-
-        <select
-          name="milkType"
-          value={collectionData.milkType}
-          onChange={handleChange}
-        >
-          <option>Cow</option>
-          <option>Buffalo</option>
-        </select>
-
-        <select
-          name="session"
-          value={collectionData.session}
-          onChange={handleChange}
-        >
-          <option>Morning</option>
-          <option>Evening</option>
-        </select>
-
-        <input
-          type="date"
-          name="collectionDate"
-          value={collectionData.collectionDate}
-          onChange={handleChange}
-        />
-
-        <input
-          name="quantity"
-          placeholder="Quantity"
-          value={collectionData.quantity}
-          onChange={handleChange}
-        />
-
-        <input
-          name="fat"
-          placeholder="Fat"
-          value={collectionData.fat}
-          onChange={handleChange}
-        />
-
-        <input
-          name="snf"
-          placeholder="SNF"
-          value={collectionData.snf}
-          onChange={handleChange}
-        />
-
-        <input value={collectionData.rate} readOnly placeholder="Auto Rate" />
-
-        <input value={collectionData.amount} readOnly placeholder="Amount" />
-
-        <button onClick={saveCollection}>
-          {editId !== null ? "Update Collection" : "Save Collection"}
-        </button>
-      </div>
-
-      <div className="session-summary-grid">
-        <div className="session-summary-card">
-          <h3>🐃 Buffalo Milk</h3>
-          <h2>{sessionBuffaloMilk} L</h2>
-          <p>₹{sessionBuffaloAmount}</p>
-        </div>
-
-        <div className="session-summary-card">
-          <h3>🐄 Cow Milk</h3>
-          <h2>{sessionCowMilk} L</h2>
-          <p>₹{sessionCowAmount}</p>
-        </div>
-
-        <div className="session-summary-card">
-          <h3>🥛 Total Milk</h3>
-          <h2>{sessionTotalMilk} L</h2>
-          <p>₹{sessionTotalAmount}</p>
-        </div>
-      </div>
-
-      <div className="collection-summary-row">
-        <div className="collection-mini-card">
-          <h3>पूर्ण संकलन</h3>
-          <h2>{completedCount}</h2>
-        </div>
-
-        <div
-          className="collection-mini-card pending-card"
-          onClick={() => setShowPendingModal(true)}
-        >
-          <h3>पेंडिंग संकलन</h3>
-          <h2>{pendingCount}</h2>
-        </div>
-      </div>
-
-      {showPendingModal && (
-        <div className="modal-overlay">
-          <div className="modal-box">
-            <div className="modal-header">
-              <h2>Pending Members</h2>
-
-              <button onClick={() => setShowPendingModal(false)}>X</button>
-            </div>
-
-            {pendingMembers.length === 0 ? (
-              <p>All members completed collection.</p>
-            ) : (
-              <ul className="pending-list">
-                {pendingMembers.map((member) => (
-                  <li key={member.memberId}>
-                    <strong>{member.memberId}</strong> - {member.name}
-                    {member.village ? ` (${member.village})` : ""}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-
-      <hr />
-
+    <div className="collection-form">
       <input
-        className="search-box"
-        placeholder="Search Member"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        name="memberId"
+        placeholder="Member ID"
+        value={collectionData.memberId}
+        onChange={(e) => {
+          handleChange(e);
+          findMember(e.target.value);
+        }}
       />
 
+      <input
+        name="memberName"
+        placeholder="Member Name"
+        value={collectionData.memberName}
+        onChange={handleChange}
+      />
+
+      <select
+        name="milkType"
+        value={collectionData.milkType}
+        onChange={handleChange}
+      >
+        <option>Cow</option>
+        <option>Buffalo</option>
+      </select>
+
+      <select
+        name="session"
+        value={collectionData.session}
+        onChange={handleChange}
+      >
+        <option>Morning</option>
+        <option>Evening</option>
+      </select>
+
+      <input
+        type="date"
+        name="collectionDate"
+        value={collectionData.collectionDate}
+        onChange={handleChange}
+      />
+
+      <input
+        name="quantity"
+        placeholder="Quantity"
+        value={collectionData.quantity}
+        onChange={handleChange}
+      />
+
+      <input
+        name="fat"
+        placeholder="Fat"
+        value={collectionData.fat}
+        onChange={handleChange}
+      />
+
+      <input
+        name="snf"
+        placeholder="SNF"
+        value={collectionData.snf}
+        onChange={handleChange}
+      />
+
+      <input
+        value={collectionData.rate}
+        readOnly
+        placeholder="Auto Rate"
+      />
+
+      <input
+        value={collectionData.amount}
+        readOnly
+        placeholder="Amount"
+      />
+
+      <button
+        type="button"
+        onClick={saveCollection}
+      >
+        {editId !== null
+          ? "Update Collection"
+          : "Save Collection"}
+      </button>
+    </div>
+
+    <div className="session-summary-grid">
+      <div className="session-summary-card">
+        <h3>🐃 Buffalo Milk</h3>
+        <h2>
+          {formatAmount(sessionBuffaloMilk)} L
+        </h2>
+        <p>
+          ₹{formatAmount(sessionBuffaloAmount)}
+        </p>
+      </div>
+
+      <div className="session-summary-card">
+        <h3>🐄 Cow Milk</h3>
+        <h2>
+          {formatAmount(sessionCowMilk)} L
+        </h2>
+        <p>
+          ₹{formatAmount(sessionCowAmount)}
+        </p>
+      </div>
+
+      <div className="session-summary-card">
+        <h3>🥛 Total Milk</h3>
+        <h2>
+          {formatAmount(sessionTotalMilk)} L
+        </h2>
+        <p>
+          ₹{formatAmount(sessionTotalAmount)}
+        </p>
+      </div>
+    </div>
+
+    <div className="collection-summary-row">
+      <div className="collection-mini-card">
+        <h3>पूर्ण संकलन</h3>
+        <h2>{completedCount}</h2>
+      </div>
+
+      <button
+        type="button"
+        className="collection-mini-card pending-card"
+        onClick={() =>
+          setShowPendingModal(true)
+        }
+      >
+        <h3>पेंडिंग संकलन</h3>
+        <h2>{pendingCount}</h2>
+      </button>
+    </div>
+
+    {showPendingModal && (
+      <div className="modal-overlay">
+        <div className="modal-box">
+          <div className="modal-header">
+            <h2>Pending Members</h2>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowPendingModal(false)
+              }
+            >
+              X
+            </button>
+          </div>
+
+          {pendingMembers.length === 0 ? (
+            <p>
+              All members completed collection.
+            </p>
+          ) : (
+            <ul className="pending-list">
+              {pendingMembers.map(
+                (member) => (
+                  <li key={member.memberId}>
+                    <strong>
+                      {member.memberId}
+                    </strong>{" "}
+                    - {member.name}
+                    {member.village
+                      ? ` (${member.village})`
+                      : ""}
+                  </li>
+                )
+              )}
+            </ul>
+          )}
+        </div>
+      </div>
+    )}
+
+    <hr />
+
+    <input
+      className="search-box"
+      placeholder="Search Member"
+      value={search}
+      onChange={(e) =>
+        setSearch(e.target.value)
+      }
+    />
+
+    {loading ? (
+      <LoadingSpinner
+        message="Loading milk collections..."
+      />
+    ) : error ? (
+      <ErrorCard
+        title="Collections could not be loaded"
+        message={error}
+        onRetry={loadCollections}
+      />
+    ) : (
       <div className="collection-card-grid compact-card-grid">
         {filteredCollections.length === 0 ? (
           <div className="empty-collection-box">
-            No collection entries for selected date and session.
+            No collection entries for selected
+            date and session.
           </div>
         ) : (
-          filteredCollections.map((collection) => (
-            <div className="compact-entry-card" key={collection.collectionId}>
-              <div className="compact-member">
-                <div className="member-info">
-                  <span className="member-animal-face">
-                    {collection.milkType === "Cow" ? "🐮" : "🐃"}
-                  </span>
+          filteredCollections.map(
+            (collection) => (
+              <div
+                className="compact-entry-card"
+                key={collection.collectionId}
+              >
+                <div className="compact-member">
+                  <div className="member-info">
+                    <span className="member-animal-face">
+                      {collection.milkType ===
+                      "Cow"
+                        ? "🐮"
+                        : "🐃"}
+                    </span>
 
-                  <div>
-                    <strong>
-                      {collection.memberId} - {collection.memberName}
-                    </strong>
+                    <div>
+                      <strong>
+                        {collection.memberId} -{" "}
+                        {collection.memberName}
+                      </strong>
 
-                    <span>{collection.collectionTime}</span>
+                      <span>
+                        {
+                          collection.collectionTime
+                        }
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <span
-                className={
-                  collection.milkType === "Cow"
-                    ? "milk-type-badge cow-badge"
-                    : "milk-type-badge buffalo-badge"
-                }
-              >
-                {collection.milkType}
-              </span>
-
-              <div className="compact-data">
-                <span>Lit</span>
-                <strong>{collection.quantity}</strong>
-              </div>
-
-              <div className="compact-data">
-                <span>Fat</span>
-                <strong>{collection.fat}</strong>
-              </div>
-
-              <div className="compact-data">
-                <span>SNF</span>
-                <strong>{collection.snf}</strong>
-              </div>
-
-              <div className="compact-data">
-                <span>Rate</span>
-                <strong>₹{collection.rate}</strong>
-              </div>
-
-              <h2 className="compact-amount">₹{collection.amount}</h2>
-
-              <div className="compact-actions">
-                <button
-                  className="edit-btn"
-                  onClick={() => editCollection(collection.collectionId)}
+                <span
+                  className={
+                    collection.milkType ===
+                    "Cow"
+                      ? "milk-type-badge cow-badge"
+                      : "milk-type-badge buffalo-badge"
+                  }
                 >
-                  Edit
-                </button>
+                  {collection.milkType}
+                </span>
 
-                <button
-                  className="delete-btn"
-                  onClick={() => deleteCollection(collection.collectionId)}
-                >
-                  Delete
-                </button>
+                <div className="compact-data">
+                  <span>Lit</span>
+                  <strong>
+                    {formatAmount(
+                      collection.quantity
+                    )}
+                  </strong>
+                </div>
+
+                <div className="compact-data">
+                  <span>Fat</span>
+                  <strong>
+                    {collection.fat}
+                  </strong>
+                </div>
+
+                <div className="compact-data">
+                  <span>SNF</span>
+                  <strong>
+                    {collection.snf}
+                  </strong>
+                </div>
+
+                <div className="compact-data">
+                  <span>Rate</span>
+                  <strong>
+                    ₹
+                    {formatAmount(
+                      collection.rate
+                    )}
+                  </strong>
+                </div>
+
+                <h2 className="compact-amount">
+                  ₹
+                  {formatAmount(
+                    collection.amount
+                  )}
+                </h2>
+
+                <div className="compact-actions">
+                  <button
+                    type="button"
+                    className="edit-btn"
+                    onClick={() =>
+                      editCollection(
+                        collection.collectionId
+                      )
+                    }
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    className="delete-btn"
+                    onClick={() =>
+                      deleteCollection(
+                        collection.collectionId
+                      )
+                    }
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            )
+          )
         )}
       </div>
-    </MainLayout>
-  );
+    )}
+  </MainLayout>
+);
 }
 
 export default Collection;

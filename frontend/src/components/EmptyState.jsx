@@ -1,11 +1,29 @@
 function EmptyState({
-  message = "No records found",
+  icon = "📂",
+  title = "No records found",
+  message =
+    "There is currently no data available.",
+  actionLabel = "",
+  onAction,
 }) {
   return (
-    <div className="empty-state">
-      <div className="empty-icon">📭</div>
-      <h3>{message}</h3>
-      <p>Try changing search or filters</p>
+    <div className="api-empty-state">
+      <div className="api-empty-icon">
+        {icon}
+      </div>
+
+      <h3>{title}</h3>
+
+      <p>{message}</p>
+
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }

@@ -4,6 +4,9 @@ import {
   Navigate,
 } from "react-router-dom";
 
+import ProtectedRoute from "../components/ProtectedRoute";
+
+import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import Members from "../pages/Members";
 import Collection from "../pages/Collection";
@@ -26,9 +29,27 @@ import FeedManagement from "../pages/FeedManagement";
 import Analytics from "../pages/Analytics";
 import BackupRestore from "../pages/BackupRestore";
 
+function PrivatePage({
+  children,
+  allowedRoles = [],
+}) {
+  return (
+    <ProtectedRoute
+      allowedRoles={allowedRoles}
+    >
+      {children}
+    </ProtectedRoute>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
+      <Route
+        path="/login"
+        element={<Login />}
+      />
+
       <Route
         path="/"
         element={
@@ -41,97 +62,181 @@ function AppRoutes() {
 
       <Route
         path="/dashboard"
-        element={<Dashboard />}
+        element={
+          <PrivatePage>
+            <Dashboard />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/members"
-        element={<Members />}
+        element={
+          <PrivatePage>
+            <Members />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/collection"
-        element={<Collection />}
+        element={
+          <PrivatePage>
+            <Collection />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/reports"
-        element={<Reports />}
+        element={
+          <PrivatePage>
+            <Reports />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/daily-report"
-        element={<DailyReport />}
+        element={
+          <PrivatePage>
+            <DailyReport />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/collection-register"
-        element={<CollectionRegister />}
+        element={
+          <PrivatePage>
+            <CollectionRegister />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/fat-snf-report"
-        element={<FatSNFReport />}
+        element={
+          <PrivatePage>
+            <FatSNFReport />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/feed-advance-report"
-        element={<FeedAdvanceReport />}
+        element={
+          <PrivatePage>
+            <FeedAdvanceReport />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/member-bill"
-        element={<MemberBill />}
+        element={
+          <PrivatePage>
+            <MemberBill />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/milk-summary"
-        element={<MilkSummary />}
+        element={
+          <PrivatePage>
+            <MilkSummary />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/payment-register"
-        element={<PaymentRegister />}
+        element={
+          <PrivatePage>
+            <PaymentRegister />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/print-all-bills"
-        element={<PrintAllBills />}
+        element={
+          <PrivatePage>
+            <PrintAllBills />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/bill-history"
-        element={<BillHistory />}
+        element={
+          <PrivatePage>
+            <BillHistory />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/reserve-report"
-        element={<ReserveReport />}
+        element={
+          <PrivatePage>
+            <ReserveReport />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/rate-master"
-        element={<RateMaster />}
+        element={
+          <PrivatePage
+            allowedRoles={[
+              "Admin",
+            ]}
+          >
+            <RateMaster />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/advance-management"
-        element={<AdvanceManagement />}
+        element={
+          <PrivatePage>
+            <AdvanceManagement />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/feed-management"
-        element={<FeedManagement />}
+        element={
+          <PrivatePage>
+            <FeedManagement />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/analytics"
-        element={<Analytics />}
+        element={
+          <PrivatePage>
+            <Analytics />
+          </PrivatePage>
+        }
       />
 
       <Route
         path="/backup"
-        element={<BackupRestore />}
+        element={
+          <PrivatePage
+            allowedRoles={[
+              "Admin",
+            ]}
+          >
+            <BackupRestore />
+          </PrivatePage>
+        }
       />
 
       <Route

@@ -3,6 +3,8 @@ import {
   useMemo,
   useState,
 } from "react";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
@@ -19,6 +21,8 @@ import {
 function MemberBill() {
   const [members, setMembers] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [pageLoading, setPageLoading] = useState(true);
+const [pageError, setPageError] = useState("");
 
   const [selectedMemberId, setSelectedMemberId] =
     useState("");
@@ -101,10 +105,48 @@ function MemberBill() {
   /*
     Runs once when the Member Bill page opens.
   */
-  useEffect(() => {
-    loadMembers();
-    loadCollections();
-  }, []);
+ useEffect(() => {
+  loadInitialData();
+}, []);
+
+async function loadInitialData() {
+  try {
+    setPageLoading(true);
+    setPageError("");
+
+    const [
+      membersResult,
+      collectionsResult,
+    ] = await Promise.all([
+      getMembers(),
+      getCollections(),
+    ]);
+
+    if (membersResult.success) {
+      setMembers(
+        membersResult.data || []
+      );
+    }
+
+    if (collectionsResult.success) {
+      setCollections(
+        collectionsResult.data || []
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Member Bill loading error:",
+      error
+    );
+
+    setPageError(
+      error.message ||
+        "Unable to load billing data"
+    );
+  } finally {
+    setPageLoading(false);
+  }
+}
 
   function getBillingDates(
     month,
@@ -429,214 +471,268 @@ function MemberBill() {
   }
 
   return (
-    <MainLayout>
-      <h1>Member Bill Report</h1>
+  <MainLayout>
+    {pageLoading ? (
+      <LoadingSpinner
+        message="Loading billing information..."
+      />
+    ) : pageError ? (
+      <ErrorCard
+        title="Billing data could not be loaded"
+        message={pageError}
+        onRetry={loadInitialData}
+      />
+    ) : (
+      <>
+        <h1>Member Bill Report</h1>
 
-      <div className="collection-form">
-        <select
-          value={selectedMemberId}
-          onChange={(event) => {
-            setSelectedMemberId(
-              event.target.value
-            );
+        <div className="collection-form">
+          <select
+            value={selectedMemberId}
+            onChange={(event) => {
+              setSelectedMemberId(
+                event.target.value
+              );
 
-            setGeneratedBill(null);
-          }}
-        >
-          <option value="">
-            Select Member
-          </option>
-
-          {members.map((member) => (
-            <option
-              key={member.memberId}
-              value={member.memberId}
-            >
-              {member.memberId} -{" "}
-              {member.name}
+              setGeneratedBill(null);
+            }}
+          >
+            <option value="">
+              Select Member
             </option>
-          ))}
-        </select>
 
-        <input
-          type="month"
-          value={billMonth}
-          onChange={(event) => {
-            setBillMonth(
-              event.target.value
-            );
+            {members.map((member) => (
+              <option
+                key={member.memberId}
+                value={member.memberId}
+              >
+                {member.memberId} -{" "}
+                {member.name}
+              </option>
+            ))}
+          </select>
 
-            setGeneratedBill(null);
-          }}
-        />
+          <input
+            type="month"
+            value={billMonth}
+            onChange={(event) => {
+              setBillMonth(
+                event.target.value
+              );
 
-        <select
-          value={billCycle}
-          onChange={(event) => {
-            setBillCycle(
-              event.target.value
-            );
+              setGeneratedBill(null);
+            }}
+          />
 
-            setGeneratedBill(null);
+          <select
+            value={billCycle}
+            onChange={(event) => {
+              setBillCycle(
+                event.target.value
+              );
+
+              setGeneratedBill(null);
+            }}
+          >
+            <option value="1">
+              Cycle 1: 1 - 10
+            </option>
+
+            <option value="2">
+              Cycle 2: 11 - 20
+            </option>
+
+            <option value="3">
+              Cycle 3: 21 - End Month
+            </option>
+          </select>
+        </div>
+
+        <p>
+          <strong>Billing Period:</strong>{" "}
+          {fromDate} to {toDate}
+        </p>
+
+        <div
+          style={{
+            marginBottom: "20px",
           }}
         >
-          <option value="1">
-            Cycle 1: 1 - 10
-          </option>
+          <button
+            type="button"
+            className="generate-bill-btn"
+            onClick={handleGenerateAllBills}
+            disabled={loading}
+          >
+            {loading
+              ? "Processing..."
+              : "Generate / Update All Bills"}
+          </button>
+        </div>
 
-          <option value="2">
-            Cycle 2: 11 - 20
-          </option>
+        {selectedMemberId && (
+          <div className="bill-box">
+            <div className="bill-header">
+              <h2>Milk Bill Preview</h2>
 
-          <option value="3">
-            Cycle 3: 21 - End Month
-          </option>
-        </select>
-      </div>
+              <p>
+                <strong>Member:</strong>{" "}
+                {selectedMember?.memberId} -{" "}
+                {selectedMember?.name}
+              </p>
 
-      <p>
-        <strong>
-          Billing Period:
-        </strong>{" "}
-        {fromDate} to {toDate}
-      </p>
+              <p>
+                <strong>Period:</strong>{" "}
+                {fromDate} to {toDate}
+              </p>
+            </div>
 
-      <div
-        style={{
-          marginBottom: "20px",
-        }}
-      >
-        <button
-          type="button"
-          className="generate-bill-btn"
-          onClick={
-            handleGenerateAllBills
-          }
-          disabled={loading}
-        >
-          {loading
-            ? "Processing..."
-            : "Generate / Update All Bills"}
-        </button>
-      </div>
+            <div className="bill-parallel-layout">
+              <div className="bill-animal-section">
+                <h2>🐄 Cow Milk</h2>
 
-      {selectedMemberId && (
-        <div className="bill-box">
-          <div className="bill-header">
-            <h2>Milk Bill Preview</h2>
+                <div className="bill-session-container">
+                  <div className="bill-session-box">
+                    <h3>Morning</h3>
 
-            <p>
-              <strong>Member:</strong>{" "}
-              {
-                selectedMember?.memberId
-              }{" "}
-              - {selectedMember?.name}
-            </p>
+                    {renderTable(
+                      cowMorningCollections
+                    )}
+                  </div>
 
-            <p>
-              <strong>Period:</strong>{" "}
-              {fromDate} to {toDate}
-            </p>
-          </div>
+                  <div className="bill-session-box">
+                    <h3>Evening</h3>
 
-          <div className="bill-parallel-layout">
-            <div className="bill-animal-section">
-              <h2>🐄 Cow Milk</h2>
-
-              <div className="bill-session-container">
-                <div className="bill-session-box">
-                  <h3>Morning</h3>
-
-                  {renderTable(
-                    cowMorningCollections
-                  )}
+                    {renderTable(
+                      cowEveningCollections
+                    )}
+                  </div>
                 </div>
 
-                <div className="bill-session-box">
-                  <h3>Evening</h3>
+                <div className="animal-total">
+                  <p>
+                    <strong>Cow Milk:</strong>{" "}
+                    {formatAmount(cowMilk)} L
+                  </p>
 
-                  {renderTable(
-                    cowEveningCollections
-                  )}
+                  <p>
+                    <strong>Cow Amount:</strong>{" "}
+                    ₹{formatAmount(cowAmount)}
+                  </p>
                 </div>
               </div>
 
-              <div className="animal-total">
-                <p>
-                  <strong>
-                    Cow Milk:
-                  </strong>{" "}
-                  {formatAmount(cowMilk)} L
-                </p>
+              <div className="bill-animal-section">
+                <h2>🐃 Buffalo Milk</h2>
 
-                <p>
-                  <strong>
-                    Cow Amount:
-                  </strong>{" "}
-                  ₹
-                  {formatAmount(
-                    cowAmount
-                  )}
-                </p>
+                <div className="bill-session-container">
+                  <div className="bill-session-box">
+                    <h3>Morning</h3>
+
+                    {renderTable(
+                      buffaloMorningCollections
+                    )}
+                  </div>
+
+                  <div className="bill-session-box">
+                    <h3>Evening</h3>
+
+                    {renderTable(
+                      buffaloEveningCollections
+                    )}
+                  </div>
+                </div>
+
+                <div className="animal-total">
+                  <p>
+                    <strong>
+                      Buffalo Milk:
+                    </strong>{" "}
+                    {formatAmount(
+                      buffaloMilk
+                    )}{" "}
+                    L
+                  </p>
+
+                  <p>
+                    <strong>
+                      Buffalo Amount:
+                    </strong>{" "}
+                    ₹
+                    {formatAmount(
+                      buffaloAmount
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="bill-animal-section">
-              <h2>🐃 Buffalo Milk</h2>
+            <div className="bill-final-summary">
+              <h2>Preview Summary</h2>
 
-              <div className="bill-session-container">
-                <div className="bill-session-box">
-                  <h3>Morning</h3>
+              <table className="bill-summary-table">
+                <tbody>
+                  <tr>
+                    <td>Total Milk</td>
 
-                  {renderTable(
-                    buffaloMorningCollections
-                  )}
-                </div>
+                    <td>
+                      {formatAmount(
+                        totalMilk
+                      )}{" "}
+                      L
+                    </td>
+                  </tr>
 
-                <div className="bill-session-box">
-                  <h3>Evening</h3>
+                  <tr>
+                    <td>Milk Amount</td>
 
-                  {renderTable(
-                    buffaloEveningCollections
-                  )}
-                </div>
-              </div>
+                    <td>
+                      ₹
+                      {formatAmount(
+                        totalAmount
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
 
-              <div className="animal-total">
-                <p>
-                  <strong>
-                    Buffalo Milk:
-                  </strong>{" "}
-                  {formatAmount(
-                    buffaloMilk
-                  )}{" "}
-                  L
-                </p>
-
-                <p>
-                  <strong>
-                    Buffalo Amount:
-                  </strong>{" "}
-                  ₹
-                  {formatAmount(
-                    buffaloAmount
-                  )}
-                </p>
-              </div>
+              <button
+                type="button"
+                className="generate-bill-btn"
+                onClick={handleGenerateBill}
+                disabled={loading}
+              >
+                {loading
+                  ? "Generating..."
+                  : "Generate / Update This Bill"}
+              </button>
             </div>
           </div>
+        )}
 
+        {generatedBill && (
           <div className="bill-final-summary">
-            <h2>Preview Summary</h2>
+            <h2>
+              Generated Bill Summary
+            </h2>
 
             <table className="bill-summary-table">
               <tbody>
+                <tr>
+                  <td>Member</td>
+
+                  <td>
+                    {generatedBill.memberId} -{" "}
+                    {generatedBill.memberName}
+                  </td>
+                </tr>
+
                 <tr>
                   <td>Total Milk</td>
 
                   <td>
                     {formatAmount(
-                      totalMilk
+                      generatedBill.totalMilk
                     )}{" "}
                     L
                   </td>
@@ -648,174 +744,112 @@ function MemberBill() {
                   <td>
                     ₹
                     {formatAmount(
-                      totalAmount
+                      generatedBill.milkAmount
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    Reserve Amount 10%
+                  </td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.reserveAmount
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>Feed Due</td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.feedDue
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>Feed Deducted</td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.feedDeducted
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>Advance Due</td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.advanceDue
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    Advance Deducted
+                  </td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.advanceDeducted
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    Total Deduction
+                  </td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.totalDeduction
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>Remaining Due</td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.remainingDue
+                    )}
+                  </td>
+                </tr>
+
+                <tr className="net-payable-row">
+                  <td>Net Payable</td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      generatedBill.netPayable
                     )}
                   </td>
                 </tr>
               </tbody>
             </table>
-
-            <button
-              type="button"
-              className="generate-bill-btn"
-              onClick={
-                handleGenerateBill
-              }
-              disabled={loading}
-            >
-              {loading
-                ? "Generating..."
-                : "Generate / Update This Bill"}
-            </button>
           </div>
-        </div>
-      )}
-
-      {generatedBill && (
-        <div className="bill-final-summary">
-          <h2>
-            Generated Bill Summary
-          </h2>
-
-          <table className="bill-summary-table">
-            <tbody>
-              <tr>
-                <td>Member</td>
-
-                <td>
-                  {
-                    generatedBill.memberId
-                  }{" "}
-                  -{" "}
-                  {
-                    generatedBill.memberName
-                  }
-                </td>
-              </tr>
-
-              <tr>
-                <td>Total Milk</td>
-
-                <td>
-                  {formatAmount(
-                    generatedBill.totalMilk
-                  )}{" "}
-                  L
-                </td>
-              </tr>
-
-              <tr>
-                <td>Milk Amount</td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.milkAmount
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  Reserve Amount 10%
-                </td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.reserveAmount
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>Feed Due</td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.feedDue
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  Feed Deducted
-                </td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.feedDeducted
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>Advance Due</td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.advanceDue
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  Advance Deducted
-                </td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.advanceDeducted
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  Total Deduction
-                </td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.totalDeduction
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td>Remaining Due</td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.remainingDue
-                  )}
-                </td>
-              </tr>
-
-              <tr className="net-payable-row">
-                <td>Net Payable</td>
-
-                <td>
-                  ₹
-                  {formatAmount(
-                    generatedBill.netPayable
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-    </MainLayout>
-  );
+        )}
+      </>
+    )}
+  </MainLayout>
+);
 }
 
 export default MemberBill;

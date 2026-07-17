@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import DataTable from "../components/DataTable";
 import StatusBadge from "../components/StatusBadge";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 
 import {
   getMembers,
@@ -23,29 +25,33 @@ function Members() {
   const [members, setMembers] = useState([]);
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadMembers();
   }, []);
 
   async function loadMembers() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
+    setError("");
 
-      const result = await getMembers();
+    const result = await getMembers();
 
-      if (result.success) {
-        setMembers(result.data);
-      } else {
-        alert(result.message || "Failed to load members");
-      }
-    } catch (error) {
-      console.log(error);
-      alert("Backend server is not running");
-    } finally {
-      setLoading(false);
+    if (result.success) {
+      setMembers(result.data || []);
     }
+  } catch (error) {
+    console.error(error);
+
+    setError(
+      error.message ||
+        "Unable to load members"
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   function handleChange(e) {
     setFormData({
@@ -218,14 +224,22 @@ function Members() {
       </div>
 
       {loading ? (
-        <p>Loading members...</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={members}
-          searchPlaceholder="Search members..."
-        />
-      )}
+  <LoadingSpinner
+    message="Loading members..."
+  />
+) : error ? (
+  <ErrorCard
+    title="Members could not be loaded"
+    message={error}
+    onRetry={loadMembers}
+  />
+) : (
+  <DataTable
+    columns={columns}
+    data={members}
+    searchPlaceholder="Search members..."
+  />
+)}
     </MainLayout>
   );
 }

@@ -1,126 +1,43 @@
-const API =
-  "http://localhost:5001/api/bills";
+import apiClient, {
+  createQuery,
+} from "./apiClient";
 
-async function handleResponse(response) {
-  let result;
+const BILL_API = "/api/bills";
 
-  try {
-    result = await response.json();
-  } catch {
-    result = {
-      success: false,
-      message:
-        "Invalid response received from backend",
-    };
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      result.message ||
-        "Bill API request failed"
-    );
-  }
-
-  return result;
-}
-
-export async function getBills(
+export function getBills(
   filters = {}
 ) {
-  const query = new URLSearchParams();
-
-  if (filters.memberId) {
-    query.append(
-      "memberId",
-      filters.memberId
-    );
-  }
-
-  if (filters.billMonth) {
-    query.append(
-      "billMonth",
-      filters.billMonth
-    );
-  }
-
-  if (filters.billCycle) {
-    query.append(
-      "billCycle",
-      filters.billCycle
-    );
-  }
-
-  const queryString =
-    query.toString();
-
-  const url = queryString
-    ? `${API}?${queryString}`
-    : API;
-
-  const response = await fetch(url);
-
-  return handleResponse(response);
-}
-
-export async function getBillById(
-  billId
-) {
-  const response = await fetch(
-    `${API}/${billId}`
+  return apiClient.get(
+    `${BILL_API}${createQuery(filters)}`
   );
-
-  return handleResponse(response);
 }
 
-export async function generateBill(
+export function getBillById(billId) {
+  return apiClient.get(
+    `${BILL_API}/${billId}`
+  );
+}
+
+export function generateBill(
   billData
 ) {
-  const response = await fetch(
-    `${API}/generate`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
-
-      body: JSON.stringify(billData),
-    }
+  return apiClient.post(
+    `${BILL_API}/generate`,
+    billData
   );
-
-  return handleResponse(response);
 }
 
-export async function generateAllBills(
+export function generateAllBills(
   billData
 ) {
-  const response = await fetch(
-    `${API}/generate-all`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
-
-      body: JSON.stringify(billData),
-    }
+  return apiClient.post(
+    `${BILL_API}/generate-all`,
+    billData
   );
-
-  return handleResponse(response);
 }
 
-export async function deleteBill(
-  billId
-) {
-  const response = await fetch(
-    `${API}/${billId}`,
-    {
-      method: "DELETE",
-    }
+export function deleteBill(billId) {
+  return apiClient.delete(
+    `${BILL_API}/${billId}`
   );
-
-  return handleResponse(response);
 }

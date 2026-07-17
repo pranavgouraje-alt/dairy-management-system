@@ -1,112 +1,62 @@
-const API =
-  "http://localhost:5001/api/advance";
+import apiClient, {
+  createQuery,
+} from "./apiClient";
 
-async function handleResponse(response) {
-  let result;
+const ADVANCE_API = "/api/advances";
 
-  try {
-    result = await response.json();
-  } catch {
-    result = {
-      success: false,
-      message:
-        "Invalid response received from backend",
-    };
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      result.message ||
-        "Advance API request failed"
-    );
-  }
-
-  return result;
+export function getAdvanceRecords(
+  filters = {}
+) {
+  return apiClient.get(
+    `${ADVANCE_API}${createQuery(
+      filters
+    )}`
+  );
 }
 
-export async function getAdvanceRecords() {
-  const response = await fetch(API);
-
-  return handleResponse(response);
-}
-
-export async function getAdvanceById(
+export function getAdvanceById(
   advanceId
 ) {
-  const response = await fetch(
-    `${API}/${advanceId}`
+  return apiClient.get(
+    `${ADVANCE_API}/${advanceId}`
   );
-
-  return handleResponse(response);
 }
 
-export async function addAdvanceRecord(
+export function addAdvanceRecord(
   advanceRecord
 ) {
-  const response = await fetch(API, {
-    method: "POST",
-
-    headers: {
-      "Content-Type": "application/json",
-    },
-
-    body: JSON.stringify(advanceRecord),
-  });
-
-  return handleResponse(response);
+  return apiClient.post(
+    ADVANCE_API,
+    advanceRecord
+  );
 }
 
-export async function updateAdvanceRecord(
+export function updateAdvanceRecord(
   advanceId,
   advanceRecord
 ) {
-  const response = await fetch(
-    `${API}/${advanceId}`,
-    {
-      method: "PUT",
-
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify(advanceRecord),
-    }
+  return apiClient.put(
+    `${ADVANCE_API}/${advanceId}`,
+    advanceRecord
   );
-
-  return handleResponse(response);
 }
 
-export async function deductAdvance(
+export function deductAdvance(
   advanceId,
   deductionAmount
 ) {
-  const response = await fetch(
-    `${API}/${advanceId}/deduct`,
+  return apiClient.patch(
+    `${ADVANCE_API}/${advanceId}/deduct`,
     {
-      method: "PATCH",
-
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify({
-        deductionAmount,
-      }),
+      deductionAmount,
     }
   );
-
-  return handleResponse(response);
 }
 
-export async function deleteAdvanceRecord(
+export function deleteAdvanceRecord(
   advanceId
 ) {
-  const response = await fetch(
-    `${API}/${advanceId}`,
-    {
-      method: "DELETE",
-    }
+  return apiClient.delete(
+    `${ADVANCE_API}/${advanceId}`
   );
-
-  return handleResponse(response);
 }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { formatAmount } from "../utils/amountUtils";
-
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 import {
   getRates,
   addRate,
@@ -21,6 +22,8 @@ function RateMaster() {
   const [rates, setRates] = useState([]);
   const [rateHistory, setRateHistory] = useState([]);
   const [editId, setEditId] = useState(null);
+  const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
 
   const [historyMonth, setHistoryMonth] = useState(
     new Date().toISOString().slice(0, 7)
@@ -45,20 +48,30 @@ function RateMaster() {
     );
   }, [rateHistory]);
 
-  async function loadRates() {
-    try {
-      const result = await getRates();
+ async function loadRates() {
+  try {
+    setLoading(true);
+    setError("");
 
-      if (result.success) {
-        setRates(result.data);
-      } else {
-        alert("Failed to load rates");
-      }
-    } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for rates");
+    const result = await getRates();
+
+    if (result.success) {
+      setRates(result.data || []);
     }
+  } catch (error) {
+    console.error(
+      "Rate loading error:",
+      error
+    );
+
+    setError(
+      error.message ||
+        "Unable to load milk rates"
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   function getBillingDates(month, cycle) {
     const [year, monthNumber] = month.split("-");
@@ -328,56 +341,91 @@ function RateMaster() {
 
       <h2>Current Active Rate Chart</h2>
 
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Milk Type</th>
-            <th>Fat</th>
-            <th>SNF</th>
-            <th>Current Rate</th>
-            <th>Created Date</th>
-            <th>Updated Date</th>
-            <th>Action</th>
+<h2>Current Active Rate Chart</h2>
+
+{loading ? (
+  <LoadingSpinner
+    message="Loading active milk rates..."
+  />
+) : error ? (
+  <ErrorCard
+    title="Rate Master could not be loaded"
+    message={error}
+    onRetry={loadRates}
+  />
+) : (
+  <table className="member-table">
+    <thead>
+      <tr>
+        <th>Milk Type</th>
+        <th>Fat</th>
+        <th>SNF</th>
+        <th>Current Rate</th>
+        <th>Created Date</th>
+        <th>Updated Date</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {rates.length === 0 ? (
+        <tr>
+          <td colSpan="7">
+            No current rates found
+          </td>
+        </tr>
+      ) : (
+        rates.map((rate) => (
+          <tr key={rate.id}>
+            <td>{rate.milkType}</td>
+            <td>{rate.fat}</td>
+            <td>{rate.snf}</td>
+
+            <td>
+              ₹{formatAmount(rate.rate)}
+            </td>
+
+            <td>
+              {rate.createdAt
+                ? rate.createdAt.split("T")[0]
+                : "-"}
+            </td>
+
+            <td>
+              {rate.updatedAt
+                ? rate.updatedAt.split("T")[0]
+                : "-"}
+            </td>
+
+            <td>
+              <div className="table-actions">
+                <button
+                  type="button"
+                  className="table-edit-btn"
+                  onClick={() =>
+                    editRate(rate)
+                  }
+                >
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  className="table-delete-btn"
+                  onClick={() =>
+                    deleteRate(rate.id)
+                  }
+                >
+                  Delete
+                </button>
+              </div>
+            </td>
           </tr>
-        </thead>
-
-        <tbody>
-          {rates.length === 0 ? (
-            <tr>
-              <td colSpan="7">No current rates found</td>
-            </tr>
-          ) : (
-            rates.map((rate) => (
-              <tr key={rate.id}>
-                <td>{rate.milkType}</td>
-                <td>{rate.fat}</td>
-                <td>{rate.snf}</td>
-                <td>₹{formatAmount(rate.rate)}</td>
-                <td>
-                  {rate.createdAt
-                    ? rate.createdAt.split("T")[0]
-                    : "-"}
-                </td>
-                <td>
-                  {rate.updatedAt
-                    ? rate.updatedAt.split("T")[0]
-                    : "-"}
-                </td>
-                <td>
-                  <button onClick={() => editRate(rate)}>
-                    Edit
-                  </button>
-
-                  <button onClick={() => deleteRate(rate.id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
+        ))
+      )}
+    </tbody>
+  </table>
+)}
       <hr />
 
       <h2>Rate History Register</h2>

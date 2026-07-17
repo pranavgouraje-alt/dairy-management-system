@@ -1,40 +1,36 @@
-const API = "http://localhost:5001/api/rates";
+import apiClient from "./apiClient";
 
+const RATE_API = "/api/rates";
 
-
-export async function getRates() {
-  const response = await fetch(API);
-  return await response.json();
+export function getRates() {
+  return apiClient.get(RATE_API);
 }
 
-export async function addRate(data) {
-  const response = await fetch(API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  return await response.json();
+export function getRateById(rateId) {
+  return apiClient.get(
+    `${RATE_API}/${rateId}`
+  );
 }
 
-export async function updateRate(id, data) {
-  const response = await fetch(`${API}/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  return await response.json();
+export function addRate(rateData) {
+  return apiClient.post(
+    RATE_API,
+    rateData
+  );
 }
 
-export async function deleteRate(id) {
-  const response = await fetch(`${API}/${id}`, {
-    method: "DELETE",
-  });
+export function updateRate(
+  rateId,
+  rateData
+) {
+  return apiClient.put(
+    `${RATE_API}/${rateId}`,
+    rateData
+  );
+}
 
-  return await response.json();
+export function deleteRate(rateId) {
+  return apiClient.delete(
+    `${RATE_API}/${rateId}`
+  );
 }

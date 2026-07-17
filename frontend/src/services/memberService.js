@@ -1,38 +1,38 @@
-const API = "http://localhost:5001/api/members";
+import apiClient from "./apiClient";
 
-export async function getMembers() {
-  const response = await fetch(API);
-  return await response.json();
+const MEMBER_API = "/api/members";
+
+export function getMembers() {
+  return apiClient.get(MEMBER_API);
 }
 
-export async function addMember(member) {
-  const response = await fetch(API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(member),
-  });
-
-  return await response.json();
+export function getMemberById(
+  memberId
+) {
+  return apiClient.get(
+    `${MEMBER_API}/${memberId}`
+  );
 }
 
-export async function updateMember(memberId, member) {
-  const response = await fetch(`${API}/${memberId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(member),
-  });
-
-  return await response.json();
+export function addMember(memberData) {
+  return apiClient.post(
+    MEMBER_API,
+    memberData
+  );
 }
 
-export async function deleteMember(memberId) {
-  const response = await fetch(`${API}/${memberId}`, {
-    method: "DELETE",
-  });
+export function updateMember(
+  memberId,
+  memberData
+) {
+  return apiClient.put(
+    `${MEMBER_API}/${memberId}`,
+    memberData
+  );
+}
 
-  return await response.json();
+export function deleteMember(memberId) {
+  return apiClient.delete(
+    `${MEMBER_API}/${memberId}`
+  );
 }

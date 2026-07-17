@@ -1,73 +1,48 @@
-const API = "http://localhost:5001/api/feed";
+import apiClient, {
+  createQuery,
+} from "./apiClient";
 
-async function handleResponse(response) {
-  let result;
+const FEED_API = "/api/feed";
 
-  try {
-    result = await response.json();
-  } catch {
-    result = {
-      success: false,
-      message: "Invalid response received from backend",
-    };
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      result.message || "Feed API request failed"
-    );
-  }
-
-  return result;
+export function getFeedRecords(
+  filters = {}
+) {
+  return apiClient.get(
+    `${FEED_API}${createQuery(filters)}`
+  );
 }
 
-export async function getFeedRecords() {
-  const response = await fetch(API);
-
-  return handleResponse(response);
+export function getFeedRecordById(
+  feedId
+) {
+  return apiClient.get(
+    `${FEED_API}/${feedId}`
+  );
 }
 
-export async function getFeedRecordById(feedId) {
-  const response = await fetch(`${API}/${feedId}`);
-
-  return handleResponse(response);
+export function addFeedRecord(
+  feedRecord
+) {
+  return apiClient.post(
+    FEED_API,
+    feedRecord
+  );
 }
 
-export async function addFeedRecord(feedRecord) {
-  const response = await fetch(API, {
-    method: "POST",
-
-    headers: {
-      "Content-Type": "application/json",
-    },
-
-    body: JSON.stringify(feedRecord),
-  });
-
-  return handleResponse(response);
-}
-
-export async function updateFeedRecord(
+export function updateFeedRecord(
   feedId,
   feedRecord
 ) {
-  const response = await fetch(`${API}/${feedId}`, {
-    method: "PUT",
-
-    headers: {
-      "Content-Type": "application/json",
-    },
-
-    body: JSON.stringify(feedRecord),
-  });
-
-  return handleResponse(response);
+  return apiClient.put(
+    `${FEED_API}/${feedId}`,
+    feedRecord
+  );
 }
 
-export async function deleteFeedRecord(feedId) {
-  const response = await fetch(`${API}/${feedId}`, {
-    method: "DELETE",
-  });
-
-  return handleResponse(response);
+export function deleteFeedRecord(
+  feedId
+) {
+  return apiClient.delete(
+    `${FEED_API}/${feedId}`
+  );
 }

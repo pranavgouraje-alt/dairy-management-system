@@ -5,6 +5,8 @@ import StatusBadge from "../components/StatusBadge";
 import { formatAmount } from "../utils/amountUtils";
 
 import { getMembers } from "../services/memberService";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorCard from "../components/ErrorCard";
 
 import {
   getAdvanceRecords,
@@ -24,6 +26,8 @@ function AdvanceManagement() {
     reason: "",
     status: "Pending",
   });
+
+  const [error, setError] = useState("");
 
   const [members, setMembers] =
     useState([]);
@@ -70,31 +74,32 @@ function AdvanceManagement() {
   }
 
   async function loadAdvanceRecords() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
+    setError("");
 
-      const result =
-        await getAdvanceRecords();
+    const result =
+      await getAdvanceRecords();
 
-      if (result.success) {
-        setAdvanceRecords(
-          result.data || []
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Advance loading error:",
-        error
+    if (result.success) {
+      setAdvanceRecords(
+        result.data || []
       );
-
-      alert(
-        error.message ||
-          "Unable to load advance records"
-      );
-    } finally {
-      setLoading(false);
     }
+  } catch (error) {
+    console.error(
+      "Advance loading error:",
+      error
+    );
+
+    setError(
+      error.message ||
+        "Unable to load advance records"
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -542,16 +547,22 @@ function AdvanceManagement() {
       </div>
 
       {loading ? (
-        <p>
-          Loading advance records...
-        </p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={advanceRecords}
-          searchPlaceholder="Search advance records..."
-        />
-      )}
+  <LoadingSpinner
+    message="Loading advance records..."
+  />
+) : error ? (
+  <ErrorCard
+    title="Advance records could not be loaded"
+    message={error}
+    onRetry={loadAdvanceRecords}
+  />
+) : (
+  <DataTable
+    columns={columns}
+    data={advanceRecords}
+    searchPlaceholder="Search advance records..."
+  />
+)}
     </MainLayout>
   );
 }
