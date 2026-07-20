@@ -19,7 +19,9 @@ function protect(req, res, next) {
   }
 
   const token =
-    authorizationHeader.split(" ")[1];
+    authorizationHeader
+      .slice(7)
+      .trim();
 
   if (!token) {
     return res.status(401).json({
@@ -29,13 +31,35 @@ function protect(req, res, next) {
     });
   }
 
+  const secret =
+    process.env.JWT_SECRET;
+
+  if (!secret) {
+    console.error(
+      "JWT_SECRET is missing"
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Authentication configuration error",
+    });
+  }
+
   try {
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET
+      secret
     );
 
-    req.user = decoded;
+    req.user = {
+      userId: String(
+        decoded.userId
+      ),
+      username:
+        decoded.username,
+      role: decoded.role,
+    };
 
     next();
   } catch (error) {
@@ -59,8 +83,10 @@ function protect(req, res, next) {
 }
 
 
-function allowRoles(...allowedRoles) {
-  return function roleMiddleware(
+function allowRoles(
+  ...allowedRoles
+) {
+  return function checkRole(
     req,
     res,
     next

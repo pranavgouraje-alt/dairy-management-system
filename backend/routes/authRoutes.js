@@ -5,18 +5,24 @@ const {
   getCurrentUser,
   getAllUsers,
   createUser,
-} = require("../controllers/authController");
+  updateUserStatus,
+} = require(
+  "../controllers/authController"
+);
 
 const {
   protect,
   allowRoles,
-} = require("../middleware/authMiddleware");
+} = require(
+  "../middleware/authMiddleware"
+);
 
 const router = express.Router();
 
-
-
-router.post("/login", login);
+router.post(
+  "/login",
+  login
+);
 
 
 router.get(
@@ -24,7 +30,6 @@ router.get(
   protect,
   getCurrentUser
 );
-
 
 router.get(
   "/users",
@@ -38,6 +43,14 @@ router.post(
   protect,
   allowRoles("Admin"),
   createUser
+);
+
+
+router.put(
+  "/users/:id/status",
+  protect,
+  allowRoles("Admin"),
+  updateUserStatus
 );
 
 module.exports = router;
