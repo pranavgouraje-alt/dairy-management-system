@@ -1,7 +1,7 @@
 import {
-  Routes,
-  Route,
   Navigate,
+  Route,
+  Routes,
 } from "react-router-dom";
 
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -28,6 +28,7 @@ import AdvanceManagement from "../pages/AdvanceManagement";
 import FeedManagement from "../pages/FeedManagement";
 import Analytics from "../pages/Analytics";
 import BackupRestore from "../pages/BackupRestore";
+import ActivityLogs from "../pages/ActivityLogs";
 
 function PrivatePage({
   children,
@@ -45,11 +46,13 @@ function PrivatePage({
 function AppRoutes() {
   return (
     <Routes>
+      {/* Public login route */}
       <Route
         path="/login"
         element={<Login />}
       />
 
+      {/* Default route */}
       <Route
         path="/"
         element={
@@ -60,6 +63,7 @@ function AppRoutes() {
         }
       />
 
+      {/* Dashboard */}
       <Route
         path="/dashboard"
         element={
@@ -69,6 +73,7 @@ function AppRoutes() {
         }
       />
 
+      {/* Members */}
       <Route
         path="/members"
         element={
@@ -78,6 +83,7 @@ function AppRoutes() {
         }
       />
 
+      {/* Milk collection */}
       <Route
         path="/collection"
         element={
@@ -87,6 +93,7 @@ function AppRoutes() {
         }
       />
 
+      {/* Reports hub */}
       <Route
         path="/reports"
         element={
@@ -96,6 +103,7 @@ function AppRoutes() {
         }
       />
 
+      {/* Individual report pages */}
       <Route
         path="/daily-report"
         element={
@@ -186,15 +194,12 @@ function AppRoutes() {
         }
       />
 
+      {/* Management modules */}
       <Route
-        path="/rate-master"
+        path="/feed-management"
         element={
-          <PrivatePage
-            allowedRoles={[
-              "Admin",
-            ]}
-          >
-            <RateMaster />
+          <PrivatePage>
+            <FeedManagement />
           </PrivatePage>
         }
       />
@@ -208,15 +213,19 @@ function AppRoutes() {
         }
       />
 
+      {/* Admin-only Rate Master */}
       <Route
-        path="/feed-management"
+        path="/rate-master"
         element={
-          <PrivatePage>
-            <FeedManagement />
+          <PrivatePage
+            allowedRoles={["Admin"]}
+          >
+            <RateMaster />
           </PrivatePage>
         }
       />
 
+      {/* Analytics */}
       <Route
         path="/analytics"
         element={
@@ -226,19 +235,31 @@ function AppRoutes() {
         }
       />
 
+      {/* Admin-only backup */}
       <Route
         path="/backup"
         element={
           <PrivatePage
-            allowedRoles={[
-              "Admin",
-            ]}
+            allowedRoles={["Admin"]}
           >
             <BackupRestore />
           </PrivatePage>
         }
       />
 
+      {/* Admin-only activity logs */}
+      <Route
+        path="/activity-logs"
+        element={
+          <PrivatePage
+            allowedRoles={["Admin"]}
+          >
+            <ActivityLogs />
+          </PrivatePage>
+        }
+      />
+
+      {/* Unknown route */}
       <Route
         path="*"
         element={

@@ -14,7 +14,7 @@ import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 
 import "./index.css";
-import "./styles/main.css";
+//import "./styles/main.css";
 
 createRoot(
   document.getElementById("root")
