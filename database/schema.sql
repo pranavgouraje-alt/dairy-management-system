@@ -1,10 +1,10 @@
 
 
-CREATE DATABASE IF NOT EXISTS dairy_management
+CREATE DATABASE IF NOT EXISTS dairy_management_system
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
-USE dairy_management;
+USE  dairy_management_system;
 
 
 CREATE TABLE IF NOT EXISTS users (
@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100)
         NOT NULL,
 
-    username VARCHAR(50)
+    username VARCHAR(50
+    )
         NOT NULL,
 
     email VARCHAR(150)

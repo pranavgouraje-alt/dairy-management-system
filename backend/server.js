@@ -2,6 +2,10 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const {
+  testDatabaseConnection,
+} = require("./config/db");
+
 const authRoutes = require(
   "./routes/authRoutes"
 );
@@ -46,6 +50,7 @@ const {
 
 const app = express();
 
+
 app.use(
   cors({
     origin:
@@ -55,16 +60,57 @@ app.use(
   })
 );
 
+
 app.use(express.json());
 
 
 app.use(activityLogger);
 
+
 app.get("/", (req, res) => {
-  res.send(
+  res.status(200).send(
     "Dairy Management Backend is running..."
   );
 });
+
+
+app.get(
+  "/api/health/database",
+  async (req, res) => {
+    try {
+      const {
+        pool,
+      } = require("./config/db");
+
+      const [rows] =
+        await pool.execute(
+          "SELECT NOW() AS serverTime"
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "MySQL database is connected",
+        data: {
+          serverTime:
+            rows[0].serverTime,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Database health error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "MySQL database connection failed",
+      });
+    }
+  }
+);
+
 
 app.use(
   "/api/auth",
@@ -113,7 +159,7 @@ app.use(
 
 
 app.use("/api", (req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
 
     message:
@@ -129,7 +175,7 @@ app.use(
       error
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message:
         "Internal backend server error",
@@ -137,11 +183,23 @@ app.use(
   }
 );
 
-const PORT =
-  process.env.PORT || 5001;
+const PORT = Number(
+  process.env.PORT || 5001
+);
 
-app.listen(PORT, () => {
-  console.log(
-    `Server running on port ${PORT}`
-  );
-});
+
+async function startServer() {
+  await testDatabaseConnection();
+
+  app.listen(PORT, () => {
+    console.log(
+      `Server running on port ${PORT}`
+    );
+
+    console.log(
+      `Backend URL: http://localhost:${PORT}`
+    );
+  });
+}
+
+startServer();

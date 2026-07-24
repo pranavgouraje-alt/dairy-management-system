@@ -3,7 +3,9 @@ import apiClient from "./apiClient";
 const MEMBER_API = "/api/members";
 
 export function getMembers() {
-  return apiClient.get(MEMBER_API);
+  return apiClient.get(
+    MEMBER_API
+  );
 }
 
 export function getMemberById(
@@ -14,7 +16,9 @@ export function getMemberById(
   );
 }
 
-export function addMember(memberData) {
+export function addMember(
+  memberData
+) {
   return apiClient.post(
     MEMBER_API,
     memberData
@@ -31,7 +35,9 @@ export function updateMember(
   );
 }
 
-export function deleteMember(memberId) {
+export function deleteMember(
+  memberId
+) {
   return apiClient.delete(
     `${MEMBER_API}/${memberId}`
   );
