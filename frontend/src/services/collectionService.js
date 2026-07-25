@@ -5,6 +5,7 @@ import apiClient, {
 const COLLECTION_API =
   "/api/collections";
 
+
 export function getCollections(
   filters = {}
 ) {
@@ -14,6 +15,7 @@ export function getCollections(
     )}`
   );
 }
+
 
 export function getCollectionById(
   collectionId
@@ -31,6 +33,7 @@ export function addCollection(
     collectionData
   );
 }
+
 
 export function updateCollection(
   collectionId,

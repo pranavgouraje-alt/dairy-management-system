@@ -206,130 +206,217 @@ const [error, setError] = useState("");
     });
   }
 
-  async function saveCollection() {
-    if (
-      !collectionData.memberId ||
-      !collectionData.memberName ||
-      !collectionData.quantity ||
-      !collectionData.fat ||
-      !collectionData.snf
-    ) {
-      alert("Please fill required fields");
-      return;
-    }
-
-    if (Number(collectionData.quantity) <= 0) {
-      alert("Quantity must be greater than zero");
-      return;
-    }
-
-    if (Number(collectionData.fat) <= 0) {
-      alert("Invalid fat value");
-      return;
-    }
-
-    if (Number(collectionData.snf) <= 0) {
-      alert("Invalid SNF value");
-      return;
-    }
-
-    if (Number(collectionData.rate) === 0) {
-      alert("Rate not found");
-      return;
-    }
-
-    if (isDuplicateEntry()) {
-      alert(
-        "Collection already exists for this member, date, shift and milk type. Please use Edit."
-      );
-      return;
-    }
-
-    const record = {
-      ...collectionData,
-      collectionId: editId !== null ? editId : Date.now().toString(),
-      collectionTime:
-        editId !== null
-          ? collectionData.collectionTime || new Date().toLocaleTimeString()
-          : new Date().toLocaleTimeString(),
-      updatedTime: editId !== null ? new Date().toLocaleTimeString() : "",
-    };
-
-    try {
-      let result;
-
-      if (editId !== null) {
-        result = await updateCollection(editId, record);
-      } else {
-        result = await addCollection(record);
-      }
-
-      if (!result.success) {
-        alert(result.message || "Operation failed");
-        return;
-      }
-
-      alert(result.message);
-
-      await loadCollections();
-
-      setEditId(null);
-
-      setCollectionData({
-        ...emptyForm,
-        collectionDate: new Date().toISOString().split("T")[0],
-      });
-    } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for collections");
-    }
+ async function saveCollection() {
+  if (
+    !collectionData.memberId ||
+    !collectionData.memberName ||
+    !collectionData.collectionDate ||
+    !collectionData.quantity ||
+    !collectionData.fat ||
+    !collectionData.snf ||
+    !collectionData.rate
+  ) {
+    alert(
+      "Please fill all required collection fields"
+    );
+    return;
   }
 
-  function editCollection(collectionId) {
-    const selectedCollection = collections.find(
-      (collection) => collection.collectionId === collectionId
+  if (Number(collectionData.quantity) <= 0) {
+    alert(
+      "Quantity must be greater than zero"
+    );
+    return;
+  }
+
+  if (Number(collectionData.fat) <= 0) {
+    alert("FAT must be greater than zero");
+    return;
+  }
+
+  if (Number(collectionData.snf) <= 0) {
+    alert("SNF must be greater than zero");
+    return;
+  }
+
+  if (Number(collectionData.rate) <= 0) {
+    alert(
+      "Valid rate was not found for this FAT and SNF"
+    );
+    return;
+  }
+
+  const payload = {
+    memberId:
+      String(collectionData.memberId),
+
+    memberName:
+      collectionData.memberName,
+
+    milkType:
+      collectionData.milkType,
+
+    session:
+      collectionData.session,
+
+    collectionDate:
+      collectionData.collectionDate,
+
+    quantity:
+      Number(collectionData.quantity),
+
+    fat:
+      Number(collectionData.fat),
+
+    snf:
+      Number(collectionData.snf),
+
+    rate:
+      Number(collectionData.rate),
+
+    amount:
+      Number(collectionData.amount),
+  };
+
+  try {
+    let result;
+
+    if (editId !== null) {
+      result = await updateCollection(
+        editId,
+        payload
+      );
+    } else {
+      result = await addCollection(
+        payload
+      );
+    }
+
+    alert(
+      result.message ||
+        "Collection saved successfully"
     );
 
-    if (selectedCollection) {
-      setCollectionData(selectedCollection);
-      setEditId(collectionId);
-    }
+    clearForm();
+    await loadCollections();
+  } catch (error) {
+    console.error(
+      "Save collection error:",
+      error
+    );
+
+    alert(
+      error.message ||
+        "Unable to save collection"
+    );
+  }
+}
+
+  function editCollection(collectionId) {
+  const selectedCollection =
+    collections.find(
+      (item) =>
+        String(item.collectionId) ===
+        String(collectionId)
+    );
+
+  if (!selectedCollection) {
+    alert(
+      "Collection record not found"
+    );
+
+    return;
   }
 
-  async function deleteCollection(collectionId) {
-    const confirmDelete = window.confirm(
+  setCollectionData({
+    memberId:
+      selectedCollection.memberId,
+
+    memberName:
+      selectedCollection.memberName,
+
+    milkType:
+      selectedCollection.milkType,
+
+    session:
+      selectedCollection.session,
+
+    collectionDate:
+      selectedCollection.collectionDate,
+
+    quantity:
+      String(
+        selectedCollection.quantity
+      ),
+
+    fat:
+      String(selectedCollection.fat),
+
+    snf:
+      String(selectedCollection.snf),
+
+    rate:
+      String(selectedCollection.rate),
+
+    amount:
+      String(
+        selectedCollection.amount
+      ),
+  });
+
+  setEditId(
+    selectedCollection.collectionId
+  );
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}
+
+  async function deleteCollection(
+  collectionId
+) {
+  const confirmed =
+    window.confirm(
       "Are you sure you want to delete this collection?"
     );
 
-    if (!confirmDelete) {
-      return;
-    }
-
-    try {
-      const result = await deleteCollectionApi(collectionId);
-
-      if (!result.success) {
-        alert(result.message || "Delete failed");
-        return;
-      }
-
-      alert(result.message);
-
-      await loadCollections();
-
-      if (editId === collectionId) {
-        setEditId(null);
-
-        setCollectionData({
-          ...emptyForm,
-          collectionDate: new Date().toISOString().split("T")[0],
-        });
-      }
-    } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for collections");
-    }
+  if (!confirmed) {
+    return;
   }
+
+  try {
+    const result =
+      await deleteCollectionApi(
+        collectionId
+      );
+
+    alert(
+      result.message ||
+        "Collection deleted successfully"
+    );
+
+    await loadCollections();
+
+    if (
+      String(editId) ===
+      String(collectionId)
+    ) {
+      clearForm();
+    }
+  } catch (error) {
+    console.error(
+      "Delete collection error:",
+      error
+    );
+
+    alert(
+      error.message ||
+        "Unable to delete collection"
+    );
+  }
+}
 
  return (
   <MainLayout>
