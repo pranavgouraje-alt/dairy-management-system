@@ -1,25 +1,64 @@
-const express=require("express");
+const express = require("express");
 
-const{
+const {
+  getAllRates,
+  getRateById,
+  lookupRate,
+  createRate,
+  updateRate,
+  deleteRate,
+  getRateHistory,
+} = require(
+  "../controllers/rateController"
+);
 
-getAllRates,
+const router = express.Router();
 
-createRate,
+/*
+  GET /api/rates
+*/
+router.get(
+  "/",
+  getAllRates
+);
 
-updateRate,
+/*
+  Must appear before /:id.
+*/
+router.get(
+  "/lookup",
+  lookupRate
+);
 
-deleteRate
+router.get(
+  "/history/all",
+  getRateHistory
+);
 
-}=require("../controllers/rateController");
+/*
+  GET /api/rates/:id
+*/
+router.get(
+  "/:id",
+  getRateById
+);
 
-const router=express.Router();
 
-router.get("/",getAllRates);
+router.post(
+  "/",
+  createRate
+);
 
-router.post("/",createRate);
 
-router.put("/:id",updateRate);
+router.put(
+  "/:id",
+  updateRate
+);
 
-router.delete("/:id",deleteRate);
 
-module.exports=router;
+router.delete(
+  "/:id",
+  deleteRate
+);
+
+module.exports = router;

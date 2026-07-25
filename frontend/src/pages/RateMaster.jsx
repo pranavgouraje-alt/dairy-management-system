@@ -1,126 +1,418 @@
-import { useState, useEffect } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import MainLayout from "../layouts/MainLayout";
-import { formatAmount } from "../utils/amountUtils";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorCard from "../components/ErrorCard";
+
 import {
   getRates,
   addRate,
   updateRate as updateRateApi,
   deleteRate as deleteRateApi,
+  getRateHistory,
 } from "../services/rateService";
+
+import {
+  formatAmount,
+} from "../utils/amountUtils";
+
+/*
+  Returns the current month in:
+
+  YYYY-MM
+*/
+function getCurrentMonth() {
+  return new Date()
+    .toISOString()
+    .slice(0, 7);
+}
+
+/*
+  Creates the start and end date
+  for one 10-day billing cycle.
+*/
+function getCycleDates(
+  month,
+  cycle
+) {
+  const [
+    year,
+    monthNumber,
+  ] = month
+    .split("-")
+    .map(Number);
+
+  if (!year || !monthNumber) {
+    return {
+      fromDate: "",
+      toDate: "",
+    };
+  }
+
+  const lastDay = new Date(
+    year,
+    monthNumber,
+    0
+  ).getDate();
+
+  if (cycle === "1") {
+    return {
+      fromDate: `${month}-01`,
+      toDate: `${month}-10`,
+    };
+  }
+
+  if (cycle === "2") {
+    return {
+      fromDate: `${month}-11`,
+      toDate: `${month}-20`,
+    };
+  }
+
+  return {
+    fromDate: `${month}-21`,
+
+    toDate:
+      `${month}-${String(
+        lastDay
+      ).padStart(2, "0")}`,
+  };
+}
+
+/*
+  Normalizes dates received from MySQL.
+*/
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return String(value)
+    .split("T")[0];
+}
+
+/*
+  Converts action names into
+  lowercase CSS-safe class names.
+*/
+function getHistoryActionClass(
+  action
+) {
+  return String(action || "")
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
 
 function RateMaster() {
   const emptyForm = {
     milkType: "Cow",
     fat: "",
-    snf: "",
+    snf: "8.5",
     rate: "",
+    status: "Active",
   };
 
-  const [rateForm, setRateForm] = useState(emptyForm);
-  const [rates, setRates] = useState([]);
-  const [rateHistory, setRateHistory] = useState([]);
-  const [editId, setEditId] = useState(null);
-  const [loading, setLoading] = useState(false);
-const [error, setError] = useState("");
+  const [
+    rateForm,
+    setRateForm,
+  ] = useState(emptyForm);
 
-  const [historyMonth, setHistoryMonth] = useState(
-    new Date().toISOString().slice(0, 7)
+  const [rates, setRates] =
+    useState([]);
+
+  const [history, setHistory] =
+    useState([]);
+
+  const [editId, setEditId] =
+    useState(null);
+
+  const [
+    historyMonth,
+    setHistoryMonth,
+  ] = useState(
+    getCurrentMonth()
   );
 
-  const [historyCycle, setHistoryCycle] = useState("1");
+  const [
+    historyCycle,
+    setHistoryCycle,
+  ] = useState("1");
+
+  const [
+    historyMilkType,
+    setHistoryMilkType,
+  ] = useState("All");
+
+  const [
+    activeRateTab,
+    setActiveRateTab,
+  ] = useState("All");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const {
+    fromDate,
+    toDate,
+  } = useMemo(
+    () =>
+      getCycleDates(
+        historyMonth,
+        historyCycle
+      ),
+    [
+      historyMonth,
+      historyCycle,
+    ]
+  );
+
+  /*
+    Separate Cow and Buffalo rates.
+  */
+  const cowRates = useMemo(
+    () =>
+      rates
+        .filter(
+          (rate) =>
+            rate.milkType ===
+            "Cow"
+        )
+        .sort(
+          (first, second) =>
+            Number(first.fat) -
+              Number(second.fat) ||
+            Number(first.snf) -
+              Number(second.snf)
+        ),
+    [rates]
+  );
+
+  const buffaloRates = useMemo(
+    () =>
+      rates
+        .filter(
+          (rate) =>
+            rate.milkType ===
+            "Buffalo"
+        )
+        .sort(
+          (first, second) =>
+            Number(first.fat) -
+              Number(second.fat) ||
+            Number(first.snf) -
+              Number(second.snf)
+        ),
+    [rates]
+  );
+
+  const displayedRates =
+    useMemo(() => {
+      if (
+        activeRateTab === "Cow"
+      ) {
+        return cowRates;
+      }
+
+      if (
+        activeRateTab ===
+        "Buffalo"
+      ) {
+        return buffaloRates;
+      }
+
+      return rates;
+    }, [
+      activeRateTab,
+      cowRates,
+      buffaloRates,
+      rates,
+    ]);
+
+  const filteredHistory =
+    useMemo(() => {
+      if (
+        historyMilkType === "All"
+      ) {
+        return history;
+      }
+
+      return history.filter(
+        (item) =>
+          item.milkType ===
+          historyMilkType
+      );
+    }, [
+      history,
+      historyMilkType,
+    ]);
+
+  /*
+    Summary values.
+  */
+  const activeRatesCount =
+    rates.filter(
+      (rate) =>
+        rate.status === "Active"
+    ).length;
+
+  const inactiveRatesCount =
+    rates.filter(
+      (rate) =>
+        rate.status ===
+        "Inactive"
+    ).length;
+
+  const historyCreatedCount =
+    history.filter(
+      (item) =>
+        item.action === "Created"
+    ).length;
+
+  const historyUpdatedCount =
+    history.filter(
+      (item) =>
+        item.action === "Updated"
+    ).length;
+
+  const historyDeletedCount =
+    history.filter(
+      (item) =>
+        item.action === "Deleted"
+    ).length;
 
   useEffect(() => {
-    loadRates();
-
-    const savedHistory = localStorage.getItem("rateHistory");
-
-    if (savedHistory) {
-      setRateHistory(JSON.parse(savedHistory));
-    }
+    loadPageData();
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(
-      "rateHistory",
-      JSON.stringify(rateHistory)
-    );
-  }, [rateHistory]);
+    loadHistory();
+  }, [
+    fromDate,
+    toDate,
+  ]);
 
- async function loadRates() {
-  try {
-    setLoading(true);
-    setError("");
+  async function loadPageData() {
+    try {
+      setLoading(true);
+      setError("");
 
-    const result = await getRates();
+      const [
+        rateResult,
+        historyResult,
+      ] = await Promise.all([
+        getRates(),
 
-    if (result.success) {
-      setRates(result.data || []);
+        getRateHistory({
+          fromDate,
+          toDate,
+        }),
+      ]);
+
+      setRates(
+        rateResult.data || []
+      );
+
+      setHistory(
+        historyResult.data || []
+      );
+    } catch (error) {
+      console.error(
+        "Rate Master loading error:",
+        error
+      );
+
+      setError(
+        error.message ||
+          "Unable to load Rate Master"
+      );
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error(
-      "Rate loading error:",
-      error
-    );
-
-    setError(
-      error.message ||
-        "Unable to load milk rates"
-    );
-  } finally {
-    setLoading(false);
-  }
-}
-
-  function getBillingDates(month, cycle) {
-    const [year, monthNumber] = month.split("-");
-
-    let fromDay = "01";
-    let toDay = "10";
-
-    if (cycle === "2") {
-      fromDay = "11";
-      toDay = "20";
-    }
-
-    if (cycle === "3") {
-      fromDay = "21";
-
-      const lastDay = new Date(
-        Number(year),
-        Number(monthNumber),
-        0
-      ).getDate();
-
-      toDay = String(lastDay).padStart(2, "0");
-    }
-
-    return {
-      fromDate: `${year}-${monthNumber}-${fromDay}`,
-      toDate: `${year}-${monthNumber}-${toDay}`,
-    };
   }
 
-  const historyDates = getBillingDates(
-    historyMonth,
-    historyCycle
-  );
+  async function loadRates() {
+    try {
+      const result =
+        await getRates();
 
-  const fromDate = historyDates.fromDate;
-  const toDate = historyDates.toDate;
+      setRates(
+        result.data || []
+      );
+    } catch (error) {
+      console.error(
+        "Load rates error:",
+        error
+      );
 
-  const filteredHistory = rateHistory.filter(
-    (item) =>
-      item.changedDate >= fromDate &&
-      item.changedDate <= toDate
-  );
+      setError(
+        error.message ||
+          "Unable to load rates"
+      );
+    }
+  }
 
-  function handleChange(e) {
-    setRateForm({
-      ...rateForm,
-      [e.target.name]: e.target.value,
-    });
+  async function loadHistory() {
+    if (!fromDate || !toDate) {
+      return;
+    }
+
+    try {
+      const result =
+        await getRateHistory({
+          fromDate,
+          toDate,
+        });
+
+      setHistory(
+        result.data || []
+      );
+    } catch (error) {
+      console.error(
+        "Load history error:",
+        error
+      );
+    }
+  }
+
+  function handleChange(event) {
+    const {
+      name,
+      value,
+    } = event.target;
+
+    setRateForm(
+      (previous) => {
+        const updatedForm = {
+          ...previous,
+          [name]: value,
+        };
+
+        /*
+          Automatically set normal
+          SNF values when milk type changes.
+        */
+        if (
+          name === "milkType"
+        ) {
+          updatedForm.snf =
+            value === "Buffalo"
+              ? "9.0"
+              : "8.5";
+        }
+
+        return updatedForm;
+      }
+    );
   }
 
   function clearForm() {
@@ -128,378 +420,1114 @@ const [error, setError] = useState("");
     setEditId(null);
   }
 
+  function validateForm() {
+    if (
+      !rateForm.milkType ||
+      !rateForm.fat ||
+      !rateForm.snf ||
+      !rateForm.rate
+    ) {
+      alert(
+        "Please fill milk type, FAT, SNF and rate"
+      );
+
+      return false;
+    }
+
+    if (
+      Number(rateForm.fat) <=
+        0 ||
+      Number(rateForm.snf) <=
+        0 ||
+      Number(rateForm.rate) <=
+        0
+    ) {
+      alert(
+        "FAT, SNF and rate must be greater than zero"
+      );
+
+      return false;
+    }
+
+    return true;
+  }
+
   async function saveRate() {
-    if (!rateForm.fat || !rateForm.snf || !rateForm.rate) {
-      alert("Fill all fields");
+    if (!validateForm()) {
       return;
     }
 
-    const today = new Date().toISOString().split("T")[0];
-
     try {
-      const result = await addRate({
-        milkType: rateForm.milkType,
-        fat: rateForm.fat,
-        snf: rateForm.snf,
-        rate: rateForm.rate,
-      });
+      setSaving(true);
 
-      if (!result.success) {
-        alert(result.message || "Rate save failed");
-        return;
-      }
+      const payload = {
+        milkType:
+          rateForm.milkType,
 
-      const historyRecord = {
-        historyId: Date.now(),
-        action: "Created",
-        milkType: rateForm.milkType,
-        fat: rateForm.fat,
-        snf: rateForm.snf,
-        oldRate: "-",
-        newRate: Number(rateForm.rate).toFixed(2),
-        changedDate: today,
-        changedTime: new Date().toLocaleTimeString(),
+        fat:
+          Number(rateForm.fat),
+
+        snf:
+          Number(rateForm.snf),
+
+        rate:
+          Number(rateForm.rate),
+
+        status:
+          rateForm.status,
+
+        changedBy:
+          "System Administrator",
       };
 
-      setRateHistory([...rateHistory, historyRecord]);
+      const result =
+        editId !== null
+          ? await updateRateApi(
+              editId,
+              payload
+            )
+          : await addRate(
+              payload
+            );
 
-      alert(result.message);
+      alert(
+        result.message ||
+          "Rate saved successfully"
+      );
 
       clearForm();
 
-      await loadRates();
+      await Promise.all([
+        loadRates(),
+        loadHistory(),
+      ]);
     } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for rates");
+      console.error(
+        "Save rate error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to save rate"
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
   function editRate(rate) {
+    setRateForm({
+      milkType:
+        rate.milkType,
+
+      fat:
+        String(rate.fat),
+
+      snf:
+        String(rate.snf),
+
+      rate:
+        String(rate.rate),
+
+      status:
+        rate.status ||
+        "Active",
+    });
+
     setEditId(rate.id);
 
-    setRateForm({
-      milkType: rate.milkType,
-      fat: rate.fat,
-      snf: rate.snf,
-      rate: rate.rate,
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
     });
   }
 
-  async function updateRate() {
-    if (!rateForm.fat || !rateForm.snf || !rateForm.rate) {
-      alert("Fill all fields");
+  async function deleteRate(
+    rateId
+  ) {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this rate?"
+      );
+
+    if (!confirmed) {
       return;
     }
-
-    const oldRate = rates.find((item) => item.id === editId);
-
-    if (!oldRate) {
-      alert("Rate not found");
-      return;
-    }
-
-    const today = new Date().toISOString().split("T")[0];
 
     try {
-      const result = await updateRateApi(editId, {
-        milkType: rateForm.milkType,
-        fat: rateForm.fat,
-        snf: rateForm.snf,
-        rate: rateForm.rate,
-      });
+      const result =
+        await deleteRateApi(
+          rateId
+        );
 
-      if (!result.success) {
-        alert(result.message || "Rate update failed");
-        return;
+      alert(
+        result.message ||
+          "Rate deleted successfully"
+      );
+
+      if (
+        String(editId) ===
+        String(rateId)
+      ) {
+        clearForm();
       }
 
-      const historyRecord = {
-        historyId: Date.now(),
-        action: "Updated",
-        milkType: oldRate.milkType,
-        fat: oldRate.fat,
-        snf: oldRate.snf,
-        oldRate: oldRate.rate,
-        newRate: Number(rateForm.rate).toFixed(2),
-        changedDate: today,
-        changedTime: new Date().toLocaleTimeString(),
-      };
-
-      setRateHistory([...rateHistory, historyRecord]);
-
-      alert(result.message);
-
-      clearForm();
-
-      await loadRates();
+      await Promise.all([
+        loadRates(),
+        loadHistory(),
+      ]);
     } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for rates");
+      console.error(
+        "Delete rate error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to delete rate"
+      );
     }
   }
 
-  async function deleteRate(id) {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this rate?"
+  function renderRateTable(
+    rateRecords,
+    milkType
+  ) {
+    return (
+      <div
+        className={`rate-category-card ${
+          milkType === "Cow"
+            ? "cow-rate-card"
+            : "buffalo-rate-card"
+        }`}
+      >
+        <div className="rate-category-header">
+          <div className="rate-category-title">
+            <span className="rate-category-icon">
+              {milkType === "Cow"
+                ? "🐄"
+                : "🐃"}
+            </span>
+
+            <div>
+              <span>
+                {milkType} pricing
+              </span>
+
+              <h2>
+                {milkType} Milk Rates
+              </h2>
+            </div>
+          </div>
+
+          <div className="rate-category-count">
+            <strong>
+              {rateRecords.length}
+            </strong>
+
+            <span>
+              configured rates
+            </span>
+          </div>
+        </div>
+
+        <div className="rate-table-wrapper">
+          <table className="professional-rate-table">
+            <thead>
+              <tr>
+                <th>FAT</th>
+                <th>SNF</th>
+                <th>Rate / Litre</th>
+                <th>Status</th>
+                <th>Created Date</th>
+                <th>Updated Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rateRecords.length ===
+              0 ? (
+                <tr>
+                  <td
+                    colSpan="7"
+                    className="rate-empty-cell"
+                  >
+                    <div className="rate-empty-state">
+                      <span>
+                        {milkType ===
+                        "Cow"
+                          ? "🐄"
+                          : "🐃"}
+                      </span>
+
+                      <strong>
+                        No {milkType} rates
+                        found
+                      </strong>
+
+                      <p>
+                        Add a new rate using
+                        the form above.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                rateRecords.map(
+                  (rate) => (
+                    <tr key={rate.id}>
+                      <td>
+                        <span className="rate-value-pill">
+                          {rate.fat}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className="rate-value-pill">
+                          {rate.snf}
+                        </span>
+                      </td>
+
+                      <td>
+                        <strong className="rate-price-value">
+                          ₹
+                          {formatAmount(
+                            rate.rate
+                          )}
+                        </strong>
+                      </td>
+
+                      <td>
+                        <span
+                          className={
+                            rate.status ===
+                            "Active"
+                              ? "rate-status-badge rate-status-active"
+                              : "rate-status-badge rate-status-inactive"
+                          }
+                        >
+                          <span />
+
+                          {rate.status}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="rate-date-cell">
+                          <span>📅</span>
+
+                          {formatDate(
+                            rate.createdAt
+                          )}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="rate-date-cell">
+                          <span>🕒</span>
+
+                          {formatDate(
+                            rate.updatedAt
+                          )}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="rate-table-actions">
+                          <button
+                            type="button"
+                            className="rate-edit-button"
+                            onClick={() =>
+                              editRate(
+                                rate
+                              )
+                            }
+                          >
+                            <span>✏️</span>
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            className="rate-delete-button"
+                            onClick={() =>
+                              deleteRate(
+                                rate.id
+                              )
+                            }
+                          >
+                            <span>🗑️</span>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     );
+  }
 
-    if (!confirmDelete) {
-      return;
-    }
+  if (loading) {
+    return (
+      <MainLayout>
+        <LoadingSpinner
+          message="Loading Rate Master..."
+        />
+      </MainLayout>
+    );
+  }
 
-    const deletedRate = rates.find((item) => item.id === id);
-
-    if (!deletedRate) {
-      alert("Rate not found");
-      return;
-    }
-
-    const today = new Date().toISOString().split("T")[0];
-
-    try {
-      const result = await deleteRateApi(id);
-
-      if (!result.success) {
-        alert(result.message || "Rate delete failed");
-        return;
-      }
-
-      const historyRecord = {
-        historyId: Date.now(),
-        action: "Deleted",
-        milkType: deletedRate.milkType,
-        fat: deletedRate.fat,
-        snf: deletedRate.snf,
-        oldRate: deletedRate.rate,
-        newRate: "-",
-        changedDate: today,
-        changedTime: new Date().toLocaleTimeString(),
-      };
-
-      setRateHistory([...rateHistory, historyRecord]);
-
-      alert(result.message);
-
-      await loadRates();
-    } catch (error) {
-      console.log(error);
-      alert("Backend server is not running for rates");
-    }
+  if (error) {
+    return (
+      <MainLayout>
+        <ErrorCard
+          title="Rate Master could not be loaded"
+          message={error}
+          onRetry={loadPageData}
+        />
+      </MainLayout>
+    );
   }
 
   return (
     <MainLayout>
-      <h1>Rate Master</h1>
+      <div className="professional-rate-page">
+        {/* Page heading */}
 
-      <div className="collection-form">
-        <select
-          name="milkType"
-          value={rateForm.milkType}
-          onChange={handleChange}
-        >
-          <option>Cow</option>
-          <option>Buffalo</option>
-        </select>
+        <header className="rate-page-header">
+          <div>
+            <span className="rate-page-eyebrow">
+              Pricing and Rate Management
+            </span>
 
-        <input
-          type="number"
-          step="0.1"
-          name="fat"
-          placeholder="Fat"
-          value={rateForm.fat}
-          onChange={handleChange}
-        />
+            <h1>Rate Master</h1>
 
-        <input
-          type="number"
-          step="0.1"
-          name="snf"
-          placeholder="SNF"
-          value={rateForm.snf}
-          onChange={handleChange}
-        />
+            <p>
+              Configure, monitor and audit
+              Cow and Buffalo milk rates
+              based on FAT and SNF.
+            </p>
+          </div>
 
-        <input
-          type="number"
-          step="0.01"
-          name="rate"
-          placeholder="Rate"
-          value={rateForm.rate}
-          onChange={handleChange}
-        />
+          <div className="rate-page-header-badge">
+            <span>📊</span>
 
-        <button onClick={editId ? updateRate : saveRate}>
-          {editId ? "Update Rate" : "Save Rate"}
-        </button>
+            <div>
+              <small>
+                Total configured
+              </small>
 
-        {editId && (
-          <button onClick={clearForm}>
-            Cancel
-          </button>
-        )}
-      </div>
+              <strong>
+                {rates.length} Rates
+              </strong>
+            </div>
+          </div>
+        </header>
 
-      <h2>Current Active Rate Chart</h2>
+        {/* Summary cards */}
 
-<h2>Current Active Rate Chart</h2>
+        <section className="rate-summary-grid">
+          <article className="rate-summary-card rate-summary-total">
+            <div className="rate-summary-icon">
+              📋
+            </div>
 
-{loading ? (
-  <LoadingSpinner
-    message="Loading active milk rates..."
-  />
-) : error ? (
-  <ErrorCard
-    title="Rate Master could not be loaded"
-    message={error}
-    onRetry={loadRates}
-  />
-) : (
-  <table className="member-table">
-    <thead>
-      <tr>
-        <th>Milk Type</th>
-        <th>Fat</th>
-        <th>SNF</th>
-        <th>Current Rate</th>
-        <th>Created Date</th>
-        <th>Updated Date</th>
-        <th>Action</th>
-      </tr>
-    </thead>
+            <div>
+              <span>Total Rates</span>
 
-    <tbody>
-      {rates.length === 0 ? (
-        <tr>
-          <td colSpan="7">
-            No current rates found
-          </td>
-        </tr>
-      ) : (
-        rates.map((rate) => (
-          <tr key={rate.id}>
-            <td>{rate.milkType}</td>
-            <td>{rate.fat}</td>
-            <td>{rate.snf}</td>
+              <strong>
+                {rates.length}
+              </strong>
 
-            <td>
-              ₹{formatAmount(rate.rate)}
-            </td>
+              <small>
+                All configured records
+              </small>
+            </div>
+          </article>
 
-            <td>
-              {rate.createdAt
-                ? rate.createdAt.split("T")[0]
-                : "-"}
-            </td>
+          <article className="rate-summary-card rate-summary-cow">
+            <div className="rate-summary-icon">
+              🐄
+            </div>
 
-            <td>
-              {rate.updatedAt
-                ? rate.updatedAt.split("T")[0]
-                : "-"}
-            </td>
+            <div>
+              <span>Cow Rates</span>
 
-            <td>
-              <div className="table-actions">
-                <button
-                  type="button"
-                  className="table-edit-btn"
-                  onClick={() =>
-                    editRate(rate)
-                  }
-                >
-                  Edit
-                </button>
+              <strong>
+                {cowRates.length}
+              </strong>
 
-                <button
-                  type="button"
-                  className="table-delete-btn"
-                  onClick={() =>
-                    deleteRate(rate.id)
-                  }
-                >
-                  Delete
-                </button>
+              <small>
+                Cow FAT and SNF rates
+              </small>
+            </div>
+          </article>
+
+          <article className="rate-summary-card rate-summary-buffalo">
+            <div className="rate-summary-icon">
+              🐃
+            </div>
+
+            <div>
+              <span>Buffalo Rates</span>
+
+              <strong>
+                {buffaloRates.length}
+              </strong>
+
+              <small>
+                Buffalo FAT and SNF rates
+              </small>
+            </div>
+          </article>
+
+          <article className="rate-summary-card rate-summary-active">
+            <div className="rate-summary-icon">
+              ✓
+            </div>
+
+            <div>
+              <span>Active Rates</span>
+
+              <strong>
+                {activeRatesCount}
+              </strong>
+
+              <small>
+                {inactiveRatesCount} inactive
+              </small>
+            </div>
+          </article>
+        </section>
+
+        {/* Rate form */}
+
+        <section className="professional-rate-form-card">
+          <div className="rate-section-heading">
+            <div className="rate-section-heading-icon">
+              {editId
+                ? "✏️"
+                : "➕"}
+            </div>
+
+            <div>
+              <span>
+                {editId
+                  ? "Update pricing"
+                  : "Create pricing"}
+              </span>
+
+              <h2>
+                {editId
+                  ? "Edit Rate Record"
+                  : "Add New Milk Rate"}
+              </h2>
+
+              <p>
+                Define a rate for a specific
+                milk type, FAT and SNF
+                combination.
+              </p>
+            </div>
+          </div>
+
+          <div className="professional-rate-form-grid">
+            <label className="rate-form-field">
+              <span>Milk Type</span>
+
+              <select
+                name="milkType"
+                value={
+                  rateForm.milkType
+                }
+                onChange={handleChange}
+              >
+                <option value="Cow">
+                  Cow Milk
+                </option>
+
+                <option value="Buffalo">
+                  Buffalo Milk
+                </option>
+              </select>
+            </label>
+
+            <label className="rate-form-field">
+              <span>FAT Percentage</span>
+
+              <div className="rate-input-with-icon">
+                <span>%</span>
+
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  name="fat"
+                  placeholder="Enter FAT"
+                  value={rateForm.fat}
+                  onChange={handleChange}
+                />
               </div>
-            </td>
-          </tr>
-        ))
-      )}
-    </tbody>
-  </table>
-)}
-      <hr />
+            </label>
 
-      <h2>Rate History Register</h2>
+            <label className="rate-form-field">
+              <span>SNF Percentage</span>
 
-      <div className="collection-form">
-        <input
-          type="month"
-          value={historyMonth}
-          onChange={(e) =>
-            setHistoryMonth(e.target.value)
-          }
-        />
+              <div className="rate-input-with-icon">
+                <span>%</span>
 
-        <select
-          value={historyCycle}
-          onChange={(e) =>
-            setHistoryCycle(e.target.value)
-          }
-        >
-          <option value="1">Cycle 1: 1 - 10</option>
-          <option value="2">Cycle 2: 11 - 20</option>
-          <option value="3">Cycle 3: 21 - End Month</option>
-        </select>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  name="snf"
+                  placeholder="Enter SNF"
+                  value={rateForm.snf}
+                  onChange={handleChange}
+                />
+              </div>
+            </label>
+
+            <label className="rate-form-field">
+              <span>Rate Per Litre</span>
+
+              <div className="rate-input-with-icon">
+                <span>₹</span>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="rate"
+                  placeholder="Enter rate"
+                  value={rateForm.rate}
+                  onChange={handleChange}
+                />
+              </div>
+            </label>
+
+            <label className="rate-form-field">
+              <span>Rate Status</span>
+
+              <select
+                name="status"
+                value={
+                  rateForm.status
+                }
+                onChange={handleChange}
+              >
+                <option value="Active">
+                  Active
+                </option>
+
+                <option value="Inactive">
+                  Inactive
+                </option>
+              </select>
+            </label>
+
+            <div className="rate-form-actions">
+              <button
+                type="button"
+                className="rate-save-button"
+                onClick={saveRate}
+                disabled={saving}
+              >
+                <span>
+                  {editId
+                    ? "✓"
+                    : "+"}
+                </span>
+
+                {saving
+                  ? "Saving..."
+                  : editId
+                    ? "Update Rate"
+                    : "Save Rate"}
+              </button>
+
+              {editId && (
+                <button
+                  type="button"
+                  className="rate-cancel-button"
+                  onClick={clearForm}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Current rate chart */}
+
+        <section className="rate-chart-section">
+          <div className="rate-chart-topbar">
+            <div>
+              <span className="rate-section-label">
+                Current Pricing
+              </span>
+
+              <h2>
+                Milk Rate Charts
+              </h2>
+
+              <p>
+                Cow and Buffalo rates are
+                shown separately for easier
+                management.
+              </p>
+            </div>
+
+            <div className="rate-chart-tabs">
+              <button
+                type="button"
+                className={
+                  activeRateTab ===
+                  "All"
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveRateTab(
+                    "All"
+                  )
+                }
+              >
+                All
+                <span>
+                  {rates.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className={
+                  activeRateTab ===
+                  "Cow"
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveRateTab(
+                    "Cow"
+                  )
+                }
+              >
+                🐄 Cow
+                <span>
+                  {cowRates.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className={
+                  activeRateTab ===
+                  "Buffalo"
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveRateTab(
+                    "Buffalo"
+                  )
+                }
+              >
+                🐃 Buffalo
+                <span>
+                  {
+                    buffaloRates.length
+                  }
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="rate-category-grid">
+            {activeRateTab ===
+              "All" && (
+              <>
+                {renderRateTable(
+                  cowRates,
+                  "Cow"
+                )}
+
+                {renderRateTable(
+                  buffaloRates,
+                  "Buffalo"
+                )}
+              </>
+            )}
+
+            {activeRateTab ===
+              "Cow" &&
+              renderRateTable(
+                displayedRates,
+                "Cow"
+              )}
+
+            {activeRateTab ===
+              "Buffalo" &&
+              renderRateTable(
+                displayedRates,
+                "Buffalo"
+              )}
+          </div>
+        </section>
+
+        {/* History section */}
+
+        <section className="professional-rate-history">
+          <div className="rate-history-header">
+            <div>
+              <span className="rate-section-label">
+                Audit and Change Tracking
+              </span>
+
+              <h2>
+                Rate History Register
+              </h2>
+
+              <p>
+                Review created, updated and
+                deleted rate records for
+                each billing cycle.
+              </p>
+            </div>
+
+            <div className="history-summary">
+              <div>
+                <span className="history-created-dot" />
+
+                <small>Created</small>
+
+                <strong>
+                  {
+                    historyCreatedCount
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span className="history-updated-dot" />
+
+                <small>Updated</small>
+
+                <strong>
+                  {
+                    historyUpdatedCount
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span className="history-deleted-dot" />
+
+                <small>Deleted</small>
+
+                <strong>
+                  {
+                    historyDeletedCount
+                  }
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="rate-history-filters">
+            <label>
+              <span>History Month</span>
+
+              <input
+                type="month"
+                value={
+                  historyMonth
+                }
+                onChange={(event) =>
+                  setHistoryMonth(
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+
+            <label>
+              <span>Billing Cycle</span>
+
+              <select
+                value={
+                  historyCycle
+                }
+                onChange={(event) =>
+                  setHistoryCycle(
+                    event.target.value
+                  )
+                }
+              >
+                <option value="1">
+                  Cycle 1: 1–10
+                </option>
+
+                <option value="2">
+                  Cycle 2: 11–20
+                </option>
+
+                <option value="3">
+                  Cycle 3: 21–End
+                </option>
+              </select>
+            </label>
+
+            <label>
+              <span>Milk Type</span>
+
+              <select
+                value={
+                  historyMilkType
+                }
+                onChange={(event) =>
+                  setHistoryMilkType(
+                    event.target.value
+                  )
+                }
+              >
+                <option value="All">
+                  All Milk Types
+                </option>
+
+                <option value="Cow">
+                  Cow
+                </option>
+
+                <option value="Buffalo">
+                  Buffalo
+                </option>
+              </select>
+            </label>
+
+            <div className="history-period-card">
+              <span>Selected Period</span>
+
+              <strong>
+                {fromDate}
+              </strong>
+
+              <small>to</small>
+
+              <strong>
+                {toDate}
+              </strong>
+            </div>
+          </div>
+
+          <div className="professional-history-table-wrapper">
+            <table className="professional-history-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Milk Type</th>
+                  <th>FAT</th>
+                  <th>SNF</th>
+                  <th>Previous Rate</th>
+                  <th>New Rate</th>
+                  <th>Changed Date</th>
+                  <th>Changed Time</th>
+                  <th>Changed By</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredHistory.length ===
+                0 ? (
+                  <tr>
+                    <td
+                      colSpan="9"
+                      className="history-empty-cell"
+                    >
+                      <div className="history-empty-state">
+                        <span>🕘</span>
+
+                        <strong>
+                          No rate history
+                          found
+                        </strong>
+
+                        <p>
+                          No changes were
+                          recorded during the
+                          selected period.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredHistory.map(
+                    (item) => (
+                      <tr
+                        key={
+                          item.historyId
+                        }
+                      >
+                        <td>
+                          <span
+                            className={`history-action-badge history-action-${getHistoryActionClass(
+                              item.action
+                            )}`}
+                          >
+                            {item.action ===
+                            "Created"
+                              ? "＋"
+                              : item.action ===
+                                  "Updated"
+                                ? "✎"
+                                : "−"}
+
+                            {
+                              item.action
+                            }
+                          </span>
+                        </td>
+
+                        <td>
+                          <span
+                            className={
+                              item.milkType ===
+                              "Cow"
+                                ? "history-milk-badge history-cow-badge"
+                                : "history-milk-badge history-buffalo-badge"
+                            }
+                          >
+                            {item.milkType ===
+                            "Cow"
+                              ? "🐄"
+                              : "🐃"}
+
+                            {
+                              item.milkType
+                            }
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className="history-number-value">
+                            {item.fat}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className="history-number-value">
+                            {item.snf}
+                          </span>
+                        </td>
+
+                        <td>
+                          {item.oldRate ===
+                          "-" ? (
+                            <span className="history-empty-value">
+                              —
+                            </span>
+                          ) : (
+                            <strong className="history-old-rate">
+                              ₹
+                              {formatAmount(
+                                item.oldRate
+                              )}
+                            </strong>
+                          )}
+                        </td>
+
+                        <td>
+                          {item.newRate ===
+                          "-" ? (
+                            <span className="history-empty-value">
+                              —
+                            </span>
+                          ) : (
+                            <strong className="history-new-rate">
+                              ₹
+                              {formatAmount(
+                                item.newRate
+                              )}
+                            </strong>
+                          )}
+                        </td>
+
+                        <td>
+                          <div className="history-date-time">
+                            <span>📅</span>
+
+                            <strong>
+                              {
+                                item.changedDate
+                              }
+                            </strong>
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className="history-date-time">
+                            <span>🕒</span>
+
+                            <strong>
+                              {
+                                item.changedTime
+                              }
+                            </strong>
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className="history-user">
+                            <span>
+                              {String(
+                                item.changedBy ||
+                                  "S"
+                              )
+                                .charAt(0)
+                                .toUpperCase()}
+                            </span>
+
+                            <strong>
+                              {item.changedBy ||
+                                "System"}
+                            </strong>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="history-table-footer">
+            <span>
+              Showing{" "}
+              <strong>
+                {
+                  filteredHistory.length
+                }
+              </strong>{" "}
+              history records
+            </span>
+
+            <span>
+              Period: {fromDate} to{" "}
+              {toDate}
+            </span>
+          </div>
+        </section>
       </div>
-
-      <p>
-        <strong>History Period:</strong> {fromDate} to {toDate}
-      </p>
-
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Action</th>
-            <th>Milk Type</th>
-            <th>Fat</th>
-            <th>SNF</th>
-            <th>Old Rate</th>
-            <th>New Rate</th>
-            <th>Changed Date</th>
-            <th>Changed Time</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {filteredHistory.length === 0 ? (
-            <tr>
-              <td colSpan="8">
-                No rate history found for selected cycle
-              </td>
-            </tr>
-          ) : (
-            filteredHistory.map((item) => (
-              <tr key={item.historyId}>
-                <td>{item.action}</td>
-                <td>{item.milkType}</td>
-                <td>{item.fat}</td>
-                <td>{item.snf}</td>
-                <td>
-                  {item.oldRate === "-"
-                    ? "-"
-                    : `₹${formatAmount(item.oldRate)}`}
-                </td>
-                <td>
-                  {item.newRate === "-"
-                    ? "-"
-                    : `₹${formatAmount(item.newRate)}`}
-                </td>
-                <td>{item.changedDate}</td>
-                <td>{item.changedTime}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
     </MainLayout>
   );
 }
