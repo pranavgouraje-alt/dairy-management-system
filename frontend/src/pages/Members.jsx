@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+//member.jsx
+ import { useState, useEffect } from "react";
 import MainLayout from "../layouts/MainLayout";
 import DataTable from "../components/DataTable";
 import StatusBadge from "../components/StatusBadge";
