@@ -1,717 +1,1702 @@
-const billRecords = require("../data/billData");
-const members = require("../data/membersData");
-const collections = require("../data/collectionsData");
-const feedRecords = require("../data/feedData");
-const advanceRecords = require("../data/advanceData");
+const {
+  pool,
+} = require("../config/db");
 
-/*
-  Returns billing dates based on month and cycle.
+const {
+  getBillingPeriod,
+  generatePaymentNumber,
+  roundAmount,
+} = require(
+  "../utils/billCalculator"
+);
 
-  Cycle 1 → 1 to 10
-  Cycle 2 → 11 to 20
-  Cycle 3 → 21 to month end
-*/
-function getBillingDates(month, cycle) {
-  if (!month) {
-    throw new Error("Billing month is required");
+const {
+  generateSingleMemberBill,
+  generateAllMemberBills,
+} = require(
+  "../services/billingService"
+);
+
+function cleanText(value) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return "";
   }
 
-  const [year, monthNumber] = month.split("-");
+  return String(value).trim();
+}
 
-  let fromDay = "01";
-  let toDay = "10";
+function cleanNumber(value) {
+  const numberValue =
+    Number(value);
 
-  if (String(cycle) === "2") {
-    fromDay = "11";
-    toDay = "20";
-  }
+  return Number.isFinite(
+    numberValue
+  )
+    ? numberValue
+    : 0;
+}
 
-  if (String(cycle) === "3") {
-    fromDay = "21";
-
-    const lastDay = new Date(
-      Number(year),
-      Number(monthNumber),
-      0
-    ).getDate();
-
-    toDay = String(lastDay).padStart(2, "0");
-  }
-
+function mapBill(row) {
   return {
-    fromDate: `${year}-${monthNumber}-${fromDay}`,
-    toDate: `${year}-${monthNumber}-${toDay}`,
-  };
-}
+    billId:
+      String(row.bill_id),
 
-/*
-  Returns financial year.
+    billNumber:
+      row.bill_number,
 
-  Example:
-  2026-10-01 → 2026-2027
-  2026-07-01 → 2025-2026
-*/
-function getFinancialYear(date) {
-  const selectedDate = new Date(date);
+    memberId:
+      String(row.member_id),
 
-  const year = selectedDate.getFullYear();
-  const month = selectedDate.getMonth() + 1;
+    memberName:
+      row.member_name || "",
 
-  /*
-    October = month 10.
+    mobile:
+      row.mobile || "",
 
-    Your yearly cycle starts on 1 October.
-  */
-  if (month >= 10) {
-    return `${year}-${year + 1}`;
-  }
+    village:
+      row.village || "",
 
-  return `${year - 1}-${year}`;
-}
+    billMonth:
+      row.bill_month,
 
-/*
-  Returns total milk quantity for a milk type.
-*/
-function getMilkTotal(data, milkType) {
-  return Number(
-    data
-      .filter(
-        (collection) =>
-          collection.milkType === milkType
-      )
-      .reduce(
-        (total, collection) =>
-          total +
-          Number(collection.quantity || 0),
-        0
-      )
-      .toFixed(2)
-  );
-}
+    billCycle:
+      Number(row.bill_cycle),
 
-/*
-  Returns total collection amount for a milk type.
-*/
-function getAmountTotal(data, milkType) {
-  return Number(
-    data
-      .filter(
-        (collection) =>
-          collection.milkType === milkType
-      )
-      .reduce(
-        (total, collection) =>
-          total +
-          Number(collection.amount || 0),
-        0
-      )
-      .toFixed(2)
-  );
-}
+    periodFrom:
+      row.period_from,
 
-/*
-  Finds unpaid feed amount for the member.
+    periodTo:
+      row.period_to,
 
-  Feed records from the selected billing period
-  are considered.
-*/
-function getFeedDue(memberId, fromDate, toDate) {
-  return Number(
-    feedRecords
-      .filter(
-        (record) =>
-          String(record.memberId) ===
-            String(memberId) &&
-          record.date >= fromDate &&
-          record.date <= toDate &&
-          record.status !== "Paid" &&
-          record.status !== "Deducted"
-      )
-      .reduce(
-        (total, record) =>
-          total +
-          Number(
-            record.remainingAmount ??
-              record.amount ??
-              0
-          ),
-        0
-      )
-      .toFixed(2)
-  );
-}
+    cowMilk:
+      Number(row.cow_milk),
 
-/*
-  Finds pending advance amount for a member.
-*/
-function getAdvanceDue(memberId) {
-  return Number(
-    advanceRecords
-      .filter(
-        (record) =>
-          String(record.memberId) ===
-            String(memberId) &&
-          record.status !== "Cleared"
-      )
-      .reduce(
-        (total, record) =>
-          total +
-          Number(
-            record.remainingAmount ??
-              record.amount ??
-              0
-          ),
-        0
-      )
-      .toFixed(2)
-  );
-}
+    buffaloMilk:
+      Number(
+        row.buffalo_milk
+      ),
 
-/*
-  Calculates reserve, feed deduction,
-  advance deduction and net payable.
-*/
-function calculateDeductions({
-  milkAmount,
-  feedDue,
-  advanceDue,
-}) {
-  /*
-    Reserve amount = 10% of milk amount
-  */
-  const reserveAmount = Number(
-    (Number(milkAmount) * 0.1).toFixed(2)
-  );
+    totalMilk:
+      Number(row.total_milk),
 
-  const amountAfterReserve = Number(
-    (
-      Number(milkAmount) -
-      reserveAmount
-    ).toFixed(2)
-  );
+    cowAmount:
+      Number(row.cow_amount),
 
-  /*
-    Feed deduction cannot exceed available amount.
-  */
-  const feedDeducted = Number(
-    Math.min(
-      Number(feedDue),
-      Math.max(amountAfterReserve, 0)
-    ).toFixed(2)
-  );
+    buffaloAmount:
+      Number(
+        row.buffalo_amount
+      ),
 
-  const amountAfterFeed = Number(
-    (
-      amountAfterReserve -
-      feedDeducted
-    ).toFixed(2)
-  );
+    milkAmount:
+      Number(row.milk_amount),
 
-  /*
-    Advance deduction also cannot exceed
-    remaining payable amount.
-  */
-  const advanceDeducted = Number(
-    Math.min(
-      Number(advanceDue),
-      Math.max(amountAfterFeed, 0)
-    ).toFixed(2)
-  );
+    averageFat:
+      Number(row.average_fat),
 
-  const netPayable = Number(
-    Math.max(
-      amountAfterFeed - advanceDeducted,
-      0
-    ).toFixed(2)
-  );
+    averageSnf:
+      Number(row.average_snf),
 
-  const totalDeduction = Number(
-    (
-      reserveAmount +
-      feedDeducted +
-      advanceDeducted
-    ).toFixed(2)
-  );
+    feedDue:
+      Number(row.feed_due),
 
-  const remainingFeedDue = Number(
-    Math.max(
-      Number(feedDue) - feedDeducted,
-      0
-    ).toFixed(2)
-  );
+    feedDeducted:
+      Number(
+        row.feed_deducted
+      ),
 
-  const remainingAdvanceDue = Number(
-    Math.max(
-      Number(advanceDue) - advanceDeducted,
-      0
-    ).toFixed(2)
-  );
+    advanceDue:
+      Number(row.advance_due),
 
-  const remainingDue = Number(
-    (
-      remainingFeedDue +
-      remainingAdvanceDue
-    ).toFixed(2)
-  );
+    advanceDeducted:
+      Number(
+        row.advance_deducted
+      ),
 
-  return {
-    reserveAmount,
-    feedDeducted,
-    advanceDeducted,
-    totalDeduction,
-    remainingFeedDue,
-    remainingAdvanceDue,
-    remainingDue,
-    netPayable,
-  };
-}
+    otherDeduction:
+      Number(
+        row.other_deduction
+      ),
 
-/*
-  Creates one complete bill object.
-*/
-function createBillObject({
-  memberId,
-  billMonth,
-  billCycle,
-}) {
-  const member = members.find(
-    (item) =>
-      String(item.memberId) ===
-      String(memberId)
-  );
-
-  if (!member) {
-    return {
-      error: "Member not found",
-    };
-  }
-
-  const { fromDate, toDate } =
-    getBillingDates(
-      billMonth,
-      billCycle
-    );
-
-  const memberCollections = collections.filter(
-    (collection) =>
-      String(collection.memberId) ===
-        String(memberId) &&
-      collection.collectionDate >= fromDate &&
-      collection.collectionDate <= toDate
-  );
-
-  if (memberCollections.length === 0) {
-    return {
-      error:
-        "No milk collection found for this member and billing cycle",
-    };
-  }
-
-  const cowMilk = getMilkTotal(
-    memberCollections,
-    "Cow"
-  );
-
-  const buffaloMilk = getMilkTotal(
-    memberCollections,
-    "Buffalo"
-  );
-
-  const cowAmount = getAmountTotal(
-    memberCollections,
-    "Cow"
-  );
-
-  const buffaloAmount = getAmountTotal(
-    memberCollections,
-    "Buffalo"
-  );
-
-  const totalMilk = Number(
-    (cowMilk + buffaloMilk).toFixed(2)
-  );
-
-  const milkAmount = Number(
-    (cowAmount + buffaloAmount).toFixed(2)
-  );
-
-  const feedDue = getFeedDue(
-    memberId,
-    fromDate,
-    toDate
-  );
-
-  const advanceDue =
-    getAdvanceDue(memberId);
-
-  const deductionResult =
-    calculateDeductions({
-      milkAmount,
-      feedDue,
-      advanceDue,
-    });
-
-  return {
-    billId: Date.now().toString(),
-
-    memberId: String(memberId),
-    memberName: member.name,
-
-    billMonth,
-    billCycle: String(billCycle),
-
-    fromDate,
-    toDate,
-
-    totalMilk,
-    cowMilk,
-    buffaloMilk,
-
-    milkAmount,
-    cowAmount,
-    buffaloAmount,
+    reservePercent:
+      Number(
+        row.reserve_percent
+      ),
 
     reserveAmount:
-      deductionResult.reserveAmount,
-
-    feedDue,
-    feedDeducted:
-      deductionResult.feedDeducted,
-    remainingFeedDue:
-      deductionResult.remainingFeedDue,
-
-    advanceDue,
-    advanceDeducted:
-      deductionResult.advanceDeducted,
-    remainingAdvanceDue:
-      deductionResult.remainingAdvanceDue,
+      Number(
+        row.reserve_amount
+      ),
 
     totalDeduction:
-      deductionResult.totalDeduction,
-
-    remainingDue:
-      deductionResult.remainingDue,
+      Number(
+        row.total_deduction
+      ),
 
     netPayable:
-      deductionResult.netPayable,
+      Number(row.net_payable),
 
-    financialYear:
-      getFinancialYear(fromDate),
+    paidAmount:
+      Number(row.paid_amount),
 
-    billStatus: "Generated",
+    balanceAmount:
+      Number(
+        row.balance_amount
+      ),
 
-    generatedDate: new Date()
-      .toISOString()
-      .split("T")[0],
+    status: row.status,
 
-    generatedTime:
-      new Date().toLocaleTimeString(),
+    generatedBy:
+      row.generated_by || "",
 
-    collections: memberCollections,
+    generatedAt:
+      row.generated_at,
+
+    updatedAt:
+      row.updated_at,
   };
 }
 
-/*
-  GET /api/bills
+const billSelectQuery = `
+  SELECT
+    b.bill_id,
+    b.bill_number,
+    b.member_id,
 
-  Returns all bill records.
-*/
-function getAllBills(req, res) {
-  const {
-    memberId,
-    billMonth,
-    billCycle,
-  } = req.query;
+    m.name AS member_name,
+    m.mobile,
+    m.village,
 
-  let filteredBills = [...billRecords];
+    b.bill_month,
+    b.bill_cycle,
 
-  if (memberId) {
-    filteredBills = filteredBills.filter(
-      (bill) =>
-        String(bill.memberId) ===
-        String(memberId)
-    );
-  }
+    DATE_FORMAT(
+      b.period_from,
+      '%Y-%m-%d'
+    ) AS period_from,
 
-  if (billMonth) {
-    filteredBills = filteredBills.filter(
-      (bill) =>
-        bill.billMonth === billMonth
-    );
-  }
+    DATE_FORMAT(
+      b.period_to,
+      '%Y-%m-%d'
+    ) AS period_to,
 
-  if (billCycle) {
-    filteredBills = filteredBills.filter(
-      (bill) =>
-        String(bill.billCycle) ===
-        String(billCycle)
-    );
-  }
+    b.cow_milk,
+    b.buffalo_milk,
+    b.total_milk,
 
-  res.status(200).json({
-    success: true,
-    count: filteredBills.length,
-    data: filteredBills,
-  });
-}
+    b.cow_amount,
+    b.buffalo_amount,
+    b.milk_amount,
 
-/*
-  GET /api/bills/:id
+    b.average_fat,
+    b.average_snf,
 
-  Returns one bill.
-*/
-function getBillById(req, res) {
-  const billId = req.params.id;
+    b.feed_due,
+    b.feed_deducted,
 
-  const bill = billRecords.find(
-    (item) => item.billId === billId
-  );
+    b.advance_due,
+    b.advance_deducted,
 
-  if (!bill) {
-    return res.status(404).json({
-      success: false,
-      message: "Bill not found",
-    });
-  }
+    b.other_deduction,
 
-  res.status(200).json({
-    success: true,
-    data: bill,
-  });
-}
+    b.reserve_percent,
+    b.reserve_amount,
+
+    b.total_deduction,
+    b.net_payable,
+
+    b.paid_amount,
+    b.balance_amount,
+
+    b.status,
+    b.generated_by,
+    b.generated_at,
+    b.updated_at
+
+  FROM bills b
+
+  INNER JOIN members m
+    ON m.member_id =
+       b.member_id
+`;
 
 /*
   POST /api/bills/generate
 
-  Generates or updates one member bill.
+  Body:
+
+  {
+    memberId: "1",
+    billMonth: "2026-07",
+    billCycle: 1,
+    reservePercent: 10,
+    otherDeduction: 0,
+    generatedBy: "Admin"
+  }
 */
-function generateMemberBill(req, res) {
+async function generateBill(
+  req,
+  res
+) {
   try {
-    const {
-      memberId,
-      billMonth,
-      billCycle,
-    } = req.body;
+    const memberId =
+      cleanText(
+        req.body.memberId
+      );
+
+    const billMonth =
+      cleanText(
+        req.body.billMonth
+      );
+
+    const billCycle =
+      Number(
+        req.body.billCycle
+      );
+
+    const reservePercent =
+      req.body.reservePercent ===
+      undefined
+        ? 10
+        : cleanNumber(
+            req.body
+              .reservePercent
+          );
+
+    const otherDeduction =
+      cleanNumber(
+        req.body.otherDeduction
+      );
+
+    const generatedBy =
+      cleanText(
+        req.body.generatedBy
+      ) || "System";
 
     if (
       !memberId ||
       !billMonth ||
       !billCycle
     ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Member, bill month and cycle are required",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Member, billing month and billing cycle are required",
+        });
     }
 
-    const bill = createBillObject({
-      memberId,
+    getBillingPeriod(
       billMonth,
-      billCycle,
-    });
+      billCycle
+    );
 
-    if (bill.error) {
-      return res.status(400).json({
-        success: false,
-        message: bill.error,
-      });
-    }
-
-    /*
-      Find an existing bill for the same
-      member, month and cycle.
-    */
-    const existingIndex =
-      billRecords.findIndex(
-        (item) =>
-          String(item.memberId) ===
-            String(memberId) &&
-          item.billMonth === billMonth &&
-          String(item.billCycle) ===
-            String(billCycle)
+    const result =
+      await generateSingleMemberBill(
+        {
+          memberId,
+          billMonth,
+          billCycle,
+          reservePercent,
+          otherDeduction,
+          generatedBy,
+        }
       );
 
-    if (existingIndex !== -1) {
-      bill.billId =
-        billRecords[existingIndex].billId;
+    if (result.skipped) {
+      return res
+        .status(404)
+        .json({
+          success: false,
 
-      billRecords[existingIndex] = bill;
+          message:
+            "No milk collections found for the selected member and billing period",
 
-      return res.status(200).json({
-        success: true,
-        message:
-          "Member bill updated successfully",
-        data: bill,
-      });
+          data: result,
+        });
     }
 
-    billRecords.push(bill);
+    return res
+      .status(201)
+      .json({
+        success: true,
 
-    res.status(201).json({
-      success: true,
-      message:
-        "Member bill generated successfully",
-      data: bill,
-    });
+        message:
+          "Member bill generated successfully",
+
+        data: result,
+      });
   } catch (error) {
     console.error(
-      "Generate member bill error:",
+      "Generate bill error:",
       error
     );
 
-    res.status(500).json({
-      success: false,
-      message:
-        "Unable to generate member bill",
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to generate member bill",
+      });
   }
 }
 
 /*
   POST /api/bills/generate-all
-
-  Generates bills for every member having
-  collection records in the selected cycle.
 */
-function generateAllBills(req, res) {
+async function generateAllBills(
+  req,
+  res
+) {
   try {
-    const {
-      billMonth,
-      billCycle,
-    } = req.body;
-
-    if (!billMonth || !billCycle) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Bill month and cycle are required",
-      });
-    }
-
-    const { fromDate, toDate } =
-      getBillingDates(
-        billMonth,
-        billCycle
+    const billMonth =
+      cleanText(
+        req.body.billMonth
       );
 
-    const periodCollections =
-      collections.filter(
-        (collection) =>
-          collection.collectionDate >=
-            fromDate &&
-          collection.collectionDate <=
-            toDate
+    const billCycle =
+      Number(
+        req.body.billCycle
       );
 
-    const memberIds = [
-      ...new Set(
-        periodCollections.map(
-          (collection) =>
-            String(collection.memberId)
-        )
-      ),
-    ];
-
-    if (memberIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "No collections found for this billing cycle",
-      });
-    }
-
-    const generatedBills = [];
-
-    memberIds.forEach((memberId) => {
-      const bill = createBillObject({
-        memberId,
-        billMonth,
-        billCycle,
-      });
-
-      if (!bill.error) {
-        const existingIndex =
-          billRecords.findIndex(
-            (item) =>
-              String(item.memberId) ===
-                String(memberId) &&
-              item.billMonth ===
-                billMonth &&
-              String(item.billCycle) ===
-                String(billCycle)
+    const reservePercent =
+      req.body.reservePercent ===
+      undefined
+        ? 10
+        : cleanNumber(
+            req.body
+              .reservePercent
           );
 
-        if (existingIndex !== -1) {
-          bill.billId =
-            billRecords[
-              existingIndex
-            ].billId;
+    const otherDeduction =
+      cleanNumber(
+        req.body.otherDeduction
+      );
 
-          billRecords[existingIndex] =
-            bill;
-        } else {
-          billRecords.push(bill);
+    const generatedBy =
+      cleanText(
+        req.body.generatedBy
+      ) || "System";
+
+    if (
+      !billMonth ||
+      !billCycle
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Billing month and cycle are required",
+        });
+    }
+
+    getBillingPeriod(
+      billMonth,
+      billCycle
+    );
+
+    const result =
+      await generateAllMemberBills(
+        {
+          billMonth,
+          billCycle,
+          reservePercent,
+          otherDeduction,
+          generatedBy,
         }
+      );
 
-        generatedBills.push(bill);
-      }
-    });
+    return res
+      .status(201)
+      .json({
+        success: true,
 
-    res.status(200).json({
-      success: true,
-      message: `${generatedBills.length} bills generated or updated successfully`,
-      count: generatedBills.length,
-      data: generatedBills,
-    });
+        message:
+          `${result.generatedCount} bills generated successfully`,
+
+        data: result,
+      });
   } catch (error) {
     console.error(
       "Generate all bills error:",
       error
     );
 
-    res.status(500).json({
-      success: false,
-      message:
-        "Unable to generate all bills",
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to generate bills",
+      });
+  }
+}
+
+/*
+  GET /api/bills
+
+  Optional filters:
+
+  billMonth
+  billCycle
+  memberId
+  status
+  search
+  fromDate
+  toDate
+*/
+async function getAllBills(
+  req,
+  res
+) {
+  try {
+    const {
+      billMonth,
+      billCycle,
+      memberId,
+      status,
+      search,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    const conditions = [];
+    const values = [];
+
+    if (billMonth) {
+      conditions.push(
+        "b.bill_month = ?"
+      );
+
+      values.push(
+        cleanText(billMonth)
+      );
+    }
+
+    if (billCycle) {
+      conditions.push(
+        "b.bill_cycle = ?"
+      );
+
+      values.push(
+        Number(billCycle)
+      );
+    }
+
+    if (memberId) {
+      conditions.push(
+        "b.member_id = ?"
+      );
+
+      values.push(
+        cleanText(memberId)
+      );
+    }
+
+    if (status) {
+      conditions.push(
+        "b.status = ?"
+      );
+
+      values.push(
+        cleanText(status)
+      );
+    }
+
+    if (fromDate) {
+      conditions.push(
+        "b.period_from >= ?"
+      );
+
+      values.push(
+        cleanText(fromDate)
+      );
+    }
+
+    if (toDate) {
+      conditions.push(
+        "b.period_to <= ?"
+      );
+
+      values.push(
+        cleanText(toDate)
+      );
+    }
+
+    if (search) {
+      conditions.push(`
+        (
+          b.bill_number LIKE ?
+          OR b.member_id LIKE ?
+          OR m.name LIKE ?
+          OR m.mobile LIKE ?
+          OR m.village LIKE ?
+        )
+      `);
+
+      const searchValue =
+        `%${cleanText(
+          search
+        )}%`;
+
+      values.push(
+        searchValue,
+        searchValue,
+        searchValue,
+        searchValue,
+        searchValue
+      );
+    }
+
+    let query =
+      billSelectQuery;
+
+    if (
+      conditions.length > 0
+    ) {
+      query += `
+        WHERE ${conditions.join(
+          " AND "
+        )}
+      `;
+    }
+
+    query += `
+      ORDER BY
+        b.period_from DESC,
+        CAST(
+          b.member_id
+          AS UNSIGNED
+        ),
+        b.member_id,
+        b.bill_id DESC
+    `;
+
+    const [rows] =
+      await pool.execute(
+        query,
+        values
+      );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        count: rows.length,
+        data: rows.map(mapBill),
+      });
+  } catch (error) {
+    console.error(
+      "Get bills error:",
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to load bills",
+      });
+  }
+}
+
+/*
+  GET /api/bills/summary
+*/
+async function getBillSummary(
+  req,
+  res
+) {
+  try {
+    const billMonth =
+      cleanText(
+        req.query.billMonth
+      );
+
+    const billCycle =
+      cleanText(
+        req.query.billCycle
+      );
+
+    const conditions = [];
+    const values = [];
+
+    if (billMonth) {
+      conditions.push(
+        "bill_month = ?"
+      );
+
+      values.push(billMonth);
+    }
+
+    if (billCycle) {
+      conditions.push(
+        "bill_cycle = ?"
+      );
+
+      values.push(
+        Number(billCycle)
+      );
+    }
+
+    let query = `
+      SELECT
+        COUNT(*) AS generated_bills,
+
+        COALESCE(
+          SUM(milk_amount),
+          0
+        ) AS milk_amount,
+
+        COALESCE(
+          SUM(total_deduction),
+          0
+        ) AS total_deduction,
+
+        COALESCE(
+          SUM(net_payable),
+          0
+        ) AS net_payable,
+
+        COALESCE(
+          SUM(paid_amount),
+          0
+        ) AS paid_amount,
+
+        COALESCE(
+          SUM(balance_amount),
+          0
+        ) AS balance_amount,
+
+        SUM(
+          CASE
+            WHEN status = 'Pending'
+            THEN 1
+            ELSE 0
+          END
+        ) AS pending_bills,
+
+        SUM(
+          CASE
+            WHEN status =
+                 'Partially Paid'
+            THEN 1
+            ELSE 0
+          END
+        ) AS partially_paid_bills,
+
+        SUM(
+          CASE
+            WHEN status = 'Paid'
+            THEN 1
+            ELSE 0
+          END
+        ) AS paid_bills,
+
+        SUM(
+          CASE
+            WHEN status =
+                 'Cancelled'
+            THEN 1
+            ELSE 0
+          END
+        ) AS cancelled_bills
+
+      FROM bills
+    `;
+
+    if (
+      conditions.length > 0
+    ) {
+      query += `
+        WHERE ${conditions.join(
+          " AND "
+        )}
+      `;
+    }
+
+    const [rows] =
+      await pool.execute(
+        query,
+        values
+      );
+
+    const row =
+      rows[0] || {};
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+
+        data: {
+          generatedBills:
+            Number(
+              row.generated_bills ||
+                0
+            ),
+
+          milkAmount:
+            Number(
+              row.milk_amount || 0
+            ),
+
+          totalDeduction:
+            Number(
+              row.total_deduction ||
+                0
+            ),
+
+          netPayable:
+            Number(
+              row.net_payable || 0
+            ),
+
+          paidAmount:
+            Number(
+              row.paid_amount || 0
+            ),
+
+          balanceAmount:
+            Number(
+              row.balance_amount ||
+                0
+            ),
+
+          pendingBills:
+            Number(
+              row.pending_bills ||
+                0
+            ),
+
+          partiallyPaidBills:
+            Number(
+              row.partially_paid_bills ||
+                0
+            ),
+
+          paidBills:
+            Number(
+              row.paid_bills || 0
+            ),
+
+          cancelledBills:
+            Number(
+              row.cancelled_bills ||
+                0
+            ),
+        },
+      });
+  } catch (error) {
+    console.error(
+      "Bill summary error:",
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to load bill summary",
+      });
+  }
+}
+
+/*
+  GET /api/bills/member/:memberId
+*/
+async function getMemberBills(
+  req,
+  res
+) {
+  req.query.memberId =
+    req.params.memberId;
+
+  return getAllBills(req, res);
+}
+
+/*
+  GET /api/bills/:id
+*/
+async function getBillById(
+  req,
+  res
+) {
+  try {
+    const billId =
+      cleanText(req.params.id);
+
+    const [billRows] =
+      await pool.execute(
+        `
+          ${billSelectQuery}
+
+          WHERE b.bill_id = ?
+
+          LIMIT 1
+        `,
+        [billId]
+      );
+
+    if (
+      billRows.length === 0
+    ) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            "Bill not found",
+        });
+    }
+
+    const [itemRows] =
+      await pool.execute(
+        `
+          SELECT
+            bill_item_id,
+            bill_id,
+            collection_id,
+
+            DATE_FORMAT(
+              collection_date,
+              '%Y-%m-%d'
+            ) AS collection_date,
+
+            TIME_FORMAT(
+              collection_time,
+              '%H:%i:%s'
+            ) AS collection_time,
+
+            milk_type,
+            session,
+            quantity,
+            fat,
+            snf,
+            rate,
+            amount
+
+          FROM bill_items
+
+          WHERE bill_id = ?
+
+          ORDER BY
+            collection_date ASC,
+
+            FIELD(
+              session,
+              'Morning',
+              'Evening'
+            ),
+
+            collection_time ASC
+        `,
+        [billId]
+      );
+
+    const [paymentRows] =
+      await pool.execute(
+        `
+          SELECT
+            payment_id,
+            bill_id,
+            payment_number,
+
+            DATE_FORMAT(
+              payment_date,
+              '%Y-%m-%d'
+            ) AS payment_date,
+
+            amount,
+            payment_method,
+            reference_number,
+            note,
+            received_by,
+            created_at
+
+          FROM bill_payments
+
+          WHERE bill_id = ?
+
+          ORDER BY
+            payment_date DESC,
+            payment_id DESC
+        `,
+        [billId]
+      );
+
+    const [deductionRows] =
+      await pool.execute(
+        `
+          SELECT
+            deduction_id,
+            deduction_type,
+            source_record_id,
+            description,
+            due_amount,
+            deducted_amount,
+            remaining_amount
+
+          FROM bill_deductions
+
+          WHERE bill_id = ?
+
+          ORDER BY deduction_id
+        `,
+        [billId]
+      );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+
+        data: {
+          ...mapBill(
+            billRows[0]
+          ),
+
+          items:
+            itemRows.map(
+              (item) => ({
+                billItemId:
+                  String(
+                    item.bill_item_id
+                  ),
+
+                collectionId:
+                  String(
+                    item.collection_id
+                  ),
+
+                collectionDate:
+                  item.collection_date,
+
+                collectionTime:
+                  item.collection_time,
+
+                milkType:
+                  item.milk_type,
+
+                session:
+                  item.session,
+
+                quantity:
+                  Number(
+                    item.quantity
+                  ),
+
+                fat:
+                  Number(item.fat),
+
+                snf:
+                  Number(item.snf),
+
+                rate:
+                  Number(item.rate),
+
+                amount:
+                  Number(
+                    item.amount
+                  ),
+              })
+            ),
+
+          payments:
+            paymentRows.map(
+              (payment) => ({
+                paymentId:
+                  String(
+                    payment.payment_id
+                  ),
+
+                paymentNumber:
+                  payment.payment_number,
+
+                paymentDate:
+                  payment.payment_date,
+
+                amount:
+                  Number(
+                    payment.amount
+                  ),
+
+                paymentMethod:
+                  payment.payment_method,
+
+                referenceNumber:
+                  payment.reference_number ||
+                  "",
+
+                note:
+                  payment.note || "",
+
+                receivedBy:
+                  payment.received_by ||
+                  "",
+
+                createdAt:
+                  payment.created_at,
+              })
+            ),
+
+          deductions:
+            deductionRows.map(
+              (deduction) => ({
+                deductionId:
+                  String(
+                    deduction.deduction_id
+                  ),
+
+                type:
+                  deduction.deduction_type,
+
+                sourceRecordId:
+                  deduction.source_record_id,
+
+                description:
+                  deduction.description ||
+                  "",
+
+                dueAmount:
+                  Number(
+                    deduction.due_amount
+                  ),
+
+                deductedAmount:
+                  Number(
+                    deduction.deducted_amount
+                  ),
+
+                remainingAmount:
+                  Number(
+                    deduction.remaining_amount
+                  ),
+              })
+            ),
+        },
+      });
+  } catch (error) {
+    console.error(
+      "Get bill error:",
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to load bill",
+      });
+  }
+}
+
+/*
+  PUT /api/bills/:id
+
+  Allows manual adjustment of:
+
+  otherDeduction
+  reservePercent
+  status
+*/
+async function updateBill(
+  req,
+  res
+) {
+  try {
+    const billId =
+      cleanText(req.params.id);
+
+    const [existingRows] =
+      await pool.execute(
+        `
+          SELECT *
+          FROM bills
+          WHERE bill_id = ?
+          LIMIT 1
+        `,
+        [billId]
+      );
+
+    if (
+      existingRows.length === 0
+    ) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            "Bill not found",
+        });
+    }
+
+    const existing =
+      existingRows[0];
+
+    const otherDeduction =
+      req.body.otherDeduction ===
+      undefined
+        ? Number(
+            existing
+              .other_deduction
+          )
+        : Math.max(
+            0,
+            cleanNumber(
+              req.body
+                .otherDeduction
+            )
+          );
+
+    const reservePercent =
+      req.body.reservePercent ===
+      undefined
+        ? Number(
+            existing
+              .reserve_percent
+          )
+        : Math.max(
+            0,
+            cleanNumber(
+              req.body
+                .reservePercent
+            )
+          );
+
+    const reserveAmount =
+      roundAmount(
+        Number(
+          existing.milk_amount
+        ) *
+          (reservePercent /
+            100)
+      );
+
+    const totalDeduction =
+      roundAmount(
+        reserveAmount +
+          Number(
+            existing
+              .feed_deducted
+          ) +
+          Number(
+            existing
+              .advance_deducted
+          ) +
+          otherDeduction
+      );
+
+    const netPayable =
+      roundAmount(
+        Math.max(
+          0,
+          Number(
+            existing.milk_amount
+          ) -
+            totalDeduction
+        )
+      );
+
+    const paidAmount =
+      roundAmount(
+        existing.paid_amount
+      );
+
+    const balanceAmount =
+      roundAmount(
+        Math.max(
+          0,
+          netPayable -
+            paidAmount
+        )
+      );
+
+    let status =
+      cleanText(
+        req.body.status
+      );
+
+    if (!status) {
+      status =
+        balanceAmount <= 0
+          ? "Paid"
+          : paidAmount > 0
+            ? "Partially Paid"
+            : "Pending";
+    }
+
+    const allowedStatuses = [
+      "Pending",
+      "Partially Paid",
+      "Paid",
+      "Cancelled",
+    ];
+
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Invalid bill status",
+        });
+    }
+
+    await pool.execute(
+      `
+        UPDATE bills
+        SET
+          other_deduction = ?,
+          reserve_percent = ?,
+          reserve_amount = ?,
+          total_deduction = ?,
+          net_payable = ?,
+          balance_amount = ?,
+          status = ?
+        WHERE bill_id = ?
+      `,
+      [
+        otherDeduction,
+        reservePercent,
+        reserveAmount,
+        totalDeduction,
+        netPayable,
+        balanceAmount,
+        status,
+        billId,
+      ]
+    );
+
+    return getBillById(
+      req,
+      res
+    );
+  } catch (error) {
+    console.error(
+      "Update bill error:",
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to update bill",
+      });
+  }
+}
+
+/*
+  POST /api/bills/:id/payments
+*/
+async function addBillPayment(
+  req,
+  res
+) {
+  const connection =
+    await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const billId =
+      cleanText(req.params.id);
+
+    const amount =
+      cleanNumber(
+        req.body.amount
+      );
+
+    const paymentDate =
+      cleanText(
+        req.body.paymentDate
+      ) ||
+      new Date()
+        .toISOString()
+        .split("T")[0];
+
+    const paymentMethod =
+      cleanText(
+        req.body.paymentMethod
+      ) || "Cash";
+
+    const referenceNumber =
+      cleanText(
+        req.body
+          .referenceNumber
+      );
+
+    const note =
+      cleanText(req.body.note);
+
+    const receivedBy =
+      cleanText(
+        req.body.receivedBy
+      ) || "System";
+
+    if (amount <= 0) {
+      await connection.rollback();
+
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Payment amount must be greater than zero",
+        });
+    }
+
+    const [billRows] =
+      await connection.execute(
+        `
+          SELECT
+            bill_id,
+            net_payable,
+            paid_amount,
+            balance_amount,
+            status
+          FROM bills
+          WHERE bill_id = ?
+          LIMIT 1
+          FOR UPDATE
+        `,
+        [billId]
+      );
+
+    if (
+      billRows.length === 0
+    ) {
+      await connection.rollback();
+
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            "Bill not found",
+        });
+    }
+
+    const bill =
+      billRows[0];
+
+    if (
+      bill.status ===
+      "Cancelled"
+    ) {
+      await connection.rollback();
+
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Payment cannot be recorded for a cancelled bill",
+        });
+    }
+
+    const currentBalance =
+      Number(
+        bill.balance_amount
+      );
+
+    if (
+      amount >
+      currentBalance
+    ) {
+      await connection.rollback();
+
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            `Payment cannot exceed the pending balance of ₹${currentBalance.toFixed(
+              2
+            )}`,
+        });
+    }
+
+    const paymentNumber =
+      generatePaymentNumber();
+
+    const [paymentResult] =
+      await connection.execute(
+        `
+          INSERT INTO bill_payments (
+            bill_id,
+            payment_number,
+            payment_date,
+            amount,
+            payment_method,
+            reference_number,
+            note,
+            received_by
+          )
+          VALUES (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+          )
+        `,
+        [
+          billId,
+          paymentNumber,
+          paymentDate,
+          amount,
+          paymentMethod,
+          referenceNumber ||
+            null,
+          note || null,
+          receivedBy,
+        ]
+      );
+
+    const newPaidAmount =
+      roundAmount(
+        Number(
+          bill.paid_amount
+        ) + amount
+      );
+
+    const newBalanceAmount =
+      roundAmount(
+        Math.max(
+          0,
+          Number(
+            bill.net_payable
+          ) -
+            newPaidAmount
+        )
+      );
+
+    const newStatus =
+      newBalanceAmount <= 0
+        ? "Paid"
+        : "Partially Paid";
+
+    await connection.execute(
+      `
+        UPDATE bills
+        SET
+          paid_amount = ?,
+          balance_amount = ?,
+          status = ?
+        WHERE bill_id = ?
+      `,
+      [
+        newPaidAmount,
+        newBalanceAmount,
+        newStatus,
+        billId,
+      ]
+    );
+
+    await connection.commit();
+
+    return res
+      .status(201)
+      .json({
+        success: true,
+
+        message:
+          "Bill payment recorded successfully",
+
+        data: {
+          paymentId:
+            String(
+              paymentResult.insertId
+            ),
+
+          paymentNumber,
+
+          billId,
+
+          amount:
+            roundAmount(amount),
+
+          paidAmount:
+            newPaidAmount,
+
+          balanceAmount:
+            newBalanceAmount,
+
+          status:
+            newStatus,
+        },
+      });
+  } catch (error) {
+    await connection.rollback();
+
+    console.error(
+      "Bill payment error:",
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to record bill payment",
+      });
+  } finally {
+    connection.release();
   }
 }
 
 /*
   DELETE /api/bills/:id
 
-  Deletes a bill record.
+  Bills containing payments cannot
+  be deleted.
 */
-function deleteBill(req, res) {
-  const billId = req.params.id;
+async function deleteBill(
+  req,
+  res
+) {
+  try {
+    const billId =
+      cleanText(req.params.id);
 
-  const index = billRecords.findIndex(
-    (item) => item.billId === billId
-  );
+    const [billRows] =
+      await pool.execute(
+        `
+          SELECT
+            bill_id,
+            bill_number,
+            paid_amount
+          FROM bills
+          WHERE bill_id = ?
+          LIMIT 1
+        `,
+        [billId]
+      );
 
-  if (index === -1) {
-    return res.status(404).json({
-      success: false,
-      message: "Bill not found",
-    });
+    if (
+      billRows.length === 0
+    ) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            "Bill not found",
+        });
+    }
+
+    if (
+      Number(
+        billRows[0].paid_amount
+      ) > 0
+    ) {
+      return res
+        .status(409)
+        .json({
+          success: false,
+
+          message:
+            "A bill with recorded payments cannot be deleted",
+        });
+    }
+
+    await pool.execute(
+      `
+        DELETE FROM bills
+        WHERE bill_id = ?
+      `,
+      [billId]
+    );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+
+        message:
+          "Bill deleted successfully",
+
+        data: {
+          billId,
+
+          billNumber:
+            billRows[0]
+              .bill_number,
+        },
+      });
+  } catch (error) {
+    console.error(
+      "Delete bill error:",
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        message:
+          error.sqlMessage ||
+          error.message ||
+          "Unable to delete bill",
+      });
   }
-
-  const deletedBill =
-    billRecords.splice(index, 1);
-
-  res.status(200).json({
-    success: true,
-    message:
-      "Bill deleted successfully",
-    data: deletedBill[0],
-  });
 }
 
 module.exports = {
-  getAllBills,
-  getBillById,
-  generateMemberBill,
+  generateBill,
   generateAllBills,
+  getAllBills,
+  getBillSummary,
+  getMemberBills,
+  getBillById,
+  updateBill,
+  addBillPayment,
   deleteBill,
 };
