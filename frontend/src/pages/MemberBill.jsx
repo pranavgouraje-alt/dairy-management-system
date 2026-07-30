@@ -1,20 +1,25 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
+import MainLayout from "../layouts/MainLayout";
+
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorCard from "../components/ErrorCard";
-import MainLayout from "../layouts/MainLayout";
 
 import {
   getMembers,
 } from "../services/memberService";
 
 import {
-  generateAllBills,
+  getCollections,
+} from "../services/collectionService";
+
+import {
   generateBill,
-  previewBill,
+  generateAllBills,
 } from "../services/billService";
 
 import {
@@ -25,14 +30,8 @@ function MemberBill() {
   const [members, setMembers] =
     useState([]);
 
-  const [pageLoading, setPageLoading] =
-    useState(true);
-
-  const [pageError, setPageError] =
-    useState("");
-
-  const [actionLoading, setActionLoading] =
-    useState(false);
+  const [collections, setCollections] =
+    useState([]);
 
   const [selectedMemberId, setSelectedMemberId] =
     useState("");
@@ -47,23 +46,17 @@ function MemberBill() {
   const [billCycle, setBillCycle] =
     useState("1");
 
-  const [reservePercent, setReservePercent] =
-    useState("10");
-
-  const [feedDue, setFeedDue] =
-    useState("0");
-
-  const [advanceDue, setAdvanceDue] =
-    useState("0");
-
-  const [otherDeduction, setOtherDeduction] =
-    useState("0");
-
-  const [billPreview, setBillPreview] =
-    useState(null);
-
   const [generatedBill, setGeneratedBill] =
     useState(null);
+
+  const [pageLoading, setPageLoading] =
+    useState(true);
+
+  const [actionLoading, setActionLoading] =
+    useState(false);
+
+  const [pageError, setPageError] =
+    useState("");
 
   const [message, setMessage] =
     useState("");
@@ -77,172 +70,301 @@ function MemberBill() {
       setPageLoading(true);
       setPageError("");
 
-      const result =
-        await getMembers();
+      const [
+        membersResult,
+        collectionsResult,
+      ] = await Promise.all([
+        getMembers(),
+        getCollections(),
+      ]);
 
-      if (!result.success) {
+      if (!membersResult.success) {
         throw new Error(
-          result.message ||
+          membersResult.message ||
             "Unable to load members"
         );
       }
 
+      if (!collectionsResult.success) {
+        throw new Error(
+          collectionsResult.message ||
+            "Unable to load collections"
+        );
+      }
+
       setMembers(
-        result.data || []
+        membersResult.data || []
+      );
+
+      setCollections(
+        collectionsResult.data || []
       );
     } catch (error) {
       console.error(
-        "Member Bill loading error:",
+        "Member bill loading error:",
         error
       );
 
       setPageError(
         error.message ||
-          "Unable to load billing data"
+          "Unable to load billing information"
       );
     } finally {
       setPageLoading(false);
     }
   }
 
-  function resetResult() {
-    setBillPreview(null);
+  function getBillingPeriod(
+    month,
+    cycle
+  ) {
+    const [
+      year,
+      monthNumber,
+    ] = month.split("-");
+
+    let fromDay = "01";
+    let toDay = "10";
+
+    if (String(cycle) === "2") {
+      fromDay = "11";
+      toDay = "20";
+    }
+
+    if (String(cycle) === "3") {
+      fromDay = "21";
+
+      const lastDay =
+        new Date(
+          Number(year),
+          Number(monthNumber),
+          0
+        ).getDate();
+
+      toDay = String(
+        lastDay
+      ).padStart(2, "0");
+    }
+
+    return {
+      fromDate:
+        `${year}-${monthNumber}-${fromDay}`,
+
+      toDate:
+        `${year}-${monthNumber}-${toDay}`,
+    };
+  }
+
+  const billingPeriod =
+    useMemo(() => {
+      return getBillingPeriod(
+        billMonth,
+        billCycle
+      );
+    }, [
+      billMonth,
+      billCycle,
+    ]);
+
+  const selectedMember =
+    useMemo(() => {
+      return members.find(
+        (member) =>
+          String(member.memberId) ===
+          String(selectedMemberId)
+      );
+    }, [
+      members,
+      selectedMemberId,
+    ]);
+
+  const previewCollections =
+    useMemo(() => {
+      if (!selectedMemberId) {
+        return [];
+      }
+
+      return collections.filter(
+        (collection) => {
+          return (
+            String(
+              collection.memberId
+            ) ===
+              String(
+                selectedMemberId
+              ) &&
+            collection.collectionDate >=
+              billingPeriod.fromDate &&
+            collection.collectionDate <=
+              billingPeriod.toDate
+          );
+        }
+      );
+    }, [
+      collections,
+      selectedMemberId,
+      billingPeriod,
+    ]);
+
+  const collectionSummary =
+    useMemo(() => {
+      const summary = {
+        cowMilk: 0,
+        buffaloMilk: 0,
+        totalMilk: 0,
+
+        cowAmount: 0,
+        buffaloAmount: 0,
+        totalAmount: 0,
+
+        averageFat: 0,
+        averageSnf: 0,
+      };
+
+      let weightedFat = 0;
+      let weightedSnf = 0;
+
+      previewCollections.forEach(
+        (collection) => {
+          const quantity =
+            Number(
+              collection.quantity || 0
+            );
+
+          const amount =
+            Number(
+              collection.amount || 0
+            );
+
+          const fat =
+            Number(
+              collection.fat || 0
+            );
+
+          const snf =
+            Number(
+              collection.snf || 0
+            );
+
+          if (
+            collection.milkType ===
+            "Cow"
+          ) {
+            summary.cowMilk +=
+              quantity;
+
+            summary.cowAmount +=
+              amount;
+          } else {
+            summary.buffaloMilk +=
+              quantity;
+
+            summary.buffaloAmount +=
+              amount;
+          }
+
+          summary.totalMilk +=
+            quantity;
+
+          summary.totalAmount +=
+            amount;
+
+          weightedFat +=
+            fat * quantity;
+
+          weightedSnf +=
+            snf * quantity;
+        }
+      );
+
+      if (
+        summary.totalMilk > 0
+      ) {
+        summary.averageFat =
+          weightedFat /
+          summary.totalMilk;
+
+        summary.averageSnf =
+          weightedSnf /
+          summary.totalMilk;
+      }
+
+      return {
+        cowMilk:
+          Number(
+            summary.cowMilk.toFixed(2)
+          ),
+
+        buffaloMilk:
+          Number(
+            summary.buffaloMilk.toFixed(
+              2
+            )
+          ),
+
+        totalMilk:
+          Number(
+            summary.totalMilk.toFixed(
+              2
+            )
+          ),
+
+        cowAmount:
+          Number(
+            summary.cowAmount.toFixed(
+              2
+            )
+          ),
+
+        buffaloAmount:
+          Number(
+            summary.buffaloAmount.toFixed(
+              2
+            )
+          ),
+
+        totalAmount:
+          Number(
+            summary.totalAmount.toFixed(
+              2
+            )
+          ),
+
+        averageFat:
+          Number(
+            summary.averageFat.toFixed(
+              2
+            )
+          ),
+
+        averageSnf:
+          Number(
+            summary.averageSnf.toFixed(
+              2
+            )
+          ),
+      };
+    }, [previewCollections]);
+
+  function handleFilterChange() {
     setGeneratedBill(null);
     setMessage("");
   }
 
-  function createRequestData() {
-    return {
-      memberId:
-        selectedMemberId,
-
-      billMonth,
-
-      billCycle:
-        Number(billCycle),
-
-      reservePercent:
-        Number(
-          reservePercent || 0
-        ),
-
-      feedDue:
-        Number(feedDue || 0),
-
-      advanceDue:
-        Number(
-          advanceDue || 0
-        ),
-
-      otherDeduction:
-        Number(
-          otherDeduction || 0
-        ),
-
-      generatedBy: "Admin",
-    };
-  }
-
-  function validateForm() {
+  async function handleGenerateBill() {
     if (!selectedMemberId) {
       setMessage(
-        "Please select a member"
+        "Please select a member."
       );
 
-      return false;
-    }
-
-    if (!billMonth) {
-      setMessage(
-        "Please select billing month"
-      );
-
-      return false;
-    }
-
-    const numericValues = [
-      Number(reservePercent),
-      Number(feedDue),
-      Number(advanceDue),
-      Number(otherDeduction),
-    ];
-
-    if (
-      numericValues.some(
-        (value) =>
-          !Number.isFinite(value) ||
-          value < 0
-      )
-    ) {
-      setMessage(
-        "Deduction values cannot be negative"
-      );
-
-      return false;
-    }
-
-    if (
-      Number(reservePercent) > 100
-    ) {
-      setMessage(
-        "Reserve percentage cannot exceed 100"
-      );
-
-      return false;
-    }
-
-    return true;
-  }
-
-  async function handlePreview() {
-    if (!validateForm()) {
       return;
     }
 
-    try {
-      setActionLoading(true);
-      setMessage("");
-      setGeneratedBill(null);
-
-      const result =
-        await previewBill(
-          createRequestData()
-        );
-
-      setBillPreview(
-        result.data
-      );
-
+    if (
+      previewCollections.length === 0
+    ) {
       setMessage(
-        result.data.existing
-          ? "Existing bill loaded as a fresh preview. Saving will update it."
-          : "Bill preview calculated successfully."
-      );
-    } catch (error) {
-      console.error(
-        "Bill preview error:",
-        error
-      );
-
-      setBillPreview(null);
-
-      setMessage(
-        error.message ||
-          "Unable to calculate bill preview"
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleGenerateBill() {
-    if (!validateForm()) {
-      return;
-    }
-
-    if (!billPreview) {
-      setMessage(
-        "Calculate the preview before saving the bill"
+        "No milk collection was found for this member and billing cycle."
       );
 
       return;
@@ -250,9 +372,7 @@ function MemberBill() {
 
     const confirmed =
       window.confirm(
-        billPreview.existing
-          ? "Update this existing bill using the displayed calculation?"
-          : "Generate and save this bill?"
+        `Generate bill for ${selectedMember?.name || selectedMemberId}?`
       );
 
     if (!confirmed) {
@@ -264,20 +384,33 @@ function MemberBill() {
       setMessage("");
 
       const result =
-        await generateBill(
-          createRequestData()
+        await generateBill({
+          memberId:
+            selectedMemberId,
+
+          billMonth,
+
+          billCycle:
+            Number(billCycle),
+
+          generatedBy:
+            "Admin",
+        });
+
+      if (!result.success) {
+        throw new Error(
+          result.message ||
+            "Bill generation failed"
         );
+      }
 
       setGeneratedBill(
         result.data
       );
 
-      setBillPreview(
-        result.data
-      );
-
       setMessage(
-        result.message
+        result.message ||
+          "Bill generated successfully."
       );
     } catch (error) {
       console.error(
@@ -297,7 +430,7 @@ function MemberBill() {
   async function handleGenerateAllBills() {
     const confirmed =
       window.confirm(
-        "Generate or update bills for all active members? Feed and advance deductions are kept at zero for bulk generation."
+        "Generate bills for all active members for this billing cycle?"
       );
 
     if (!confirmed) {
@@ -311,21 +444,17 @@ function MemberBill() {
       const result =
         await generateAllBills({
           billMonth,
+
           billCycle:
             Number(billCycle),
-          reservePercent:
-            Number(
-              reservePercent || 0
-            ),
-          otherDeduction:
-            Number(
-              otherDeduction || 0
-            ),
-          generatedBy: "Admin",
+
+          generatedBy:
+            "Admin",
         });
 
       setMessage(
-        `${result.data.generatedCount} generated, ${result.data.skippedCount} skipped and ${result.data.failedCount} failed.`
+        result.message ||
+          "Bills generated successfully."
       );
     } catch (error) {
       console.error(
@@ -343,89 +472,129 @@ function MemberBill() {
   }
 
   function renderCollectionTable(
-    collections
+    title,
+    milkType,
+    session
   ) {
+    const records =
+      previewCollections.filter(
+        (collection) =>
+          collection.milkType ===
+            milkType &&
+          collection.session ===
+            session
+      );
+
     return (
-      <div className="bill-table-scroll">
-        <table className="bill-items-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Session</th>
-              <th>Type</th>
-              <th>Litres</th>
-              <th>FAT</th>
-              <th>SNF</th>
-              <th>Rate</th>
-              <th>Amount</th>
-            </tr>
-          </thead>
+      <div className="bill-session-card">
+        <div className="bill-session-header">
+          <div>
+            <span>
+              {milkType === "Cow"
+                ? "🐄"
+                : "🐃"}
+            </span>
 
-          <tbody>
-            {collections.map(
-              (collection) => (
-                <tr
-                  key={
-                    collection.collectionId
-                  }
-                >
-                  <td>
-                    {
-                      collection.collectionDate
-                    }
-                  </td>
+            <div>
+              <h3>{title}</h3>
 
-                  <td>
-                    {
-                      collection.collectionTime
-                    }
-                  </td>
+              <p>
+                {records.length} entries
+              </p>
+            </div>
+          </div>
 
-                  <td>
-                    {
-                      collection.session
-                    }
-                  </td>
+          <strong>
+            {records
+              .reduce(
+                (
+                  total,
+                  collection
+                ) =>
+                  total +
+                  Number(
+                    collection.quantity ||
+                      0
+                  ),
+                0
+              )
+              .toFixed(2)}{" "}
+            L
+          </strong>
+        </div>
 
-                  <td>
-                    {
-                      collection.milkType
-                    }
-                  </td>
+        <div className="bill-table-wrapper">
+          <table className="bill-preview-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Litres</th>
+                <th>FAT</th>
+                <th>SNF</th>
+                <th>Rate</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
 
-                  <td>
-                    {
-                      collection.quantity
-                    }
-                  </td>
-
-                  <td>
-                    {collection.fat}
-                  </td>
-
-                  <td>
-                    {collection.snf}
-                  </td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      collection.rate
-                    )}
-                  </td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      collection.amount
-                    )}
+            <tbody>
+              {records.length === 0 ? (
+                <tr>
+                  <td colSpan="6">
+                    No collection
                   </td>
                 </tr>
-              )
-            )}
-          </tbody>
-        </table>
+              ) : (
+                records.map(
+                  (collection) => (
+                    <tr
+                      key={
+                        collection.collectionId
+                      }
+                    >
+                      <td>
+                        {
+                          collection.collectionDate
+                        }
+                      </td>
+
+                      <td>
+                        {
+                          collection.quantity
+                        }
+                      </td>
+
+                      <td>
+                        {
+                          collection.fat
+                        }
+                      </td>
+
+                      <td>
+                        {
+                          collection.snf
+                        }
+                      </td>
+
+                      <td>
+                        ₹
+                        {formatAmount(
+                          collection.rate
+                        )}
+                      </td>
+
+                      <td>
+                        ₹
+                        {formatAmount(
+                          collection.amount
+                        )}
+                      </td>
+                    </tr>
+                  )
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
@@ -434,34 +603,34 @@ function MemberBill() {
     <MainLayout>
       {pageLoading ? (
         <LoadingSpinner
-          message="Loading billing information..."
+          message="Loading member billing..."
         />
       ) : pageError ? (
         <ErrorCard
-          title="Billing data could not be loaded"
+          title="Member bill could not be loaded"
           message={pageError}
           onRetry={loadInitialData}
         />
       ) : (
         <div className="member-bill-page">
-          <div className="member-bill-heading">
+          <div className="member-bill-topbar">
             <div>
-              <span>
-                Bill Migration Part 2
+              <span className="page-eyebrow">
+                Milk Payment
               </span>
 
               <h1>Member Bill</h1>
 
               <p>
-                Preview and save MySQL-backed
-                milk bills with feed, advance,
-                reserve and other deductions.
+                View milk collection and
+                generate the selected
+                member&apos;s 10-day bill.
               </p>
             </div>
 
             <button
               type="button"
-              className="bill-secondary-button"
+              className="generate-all-bills-button"
               disabled={actionLoading}
               onClick={
                 handleGenerateAllBills
@@ -472,13 +641,13 @@ function MemberBill() {
           </div>
 
           {message && (
-            <div className="bill-page-message">
+            <div className="member-bill-message">
               {message}
             </div>
           )}
 
-          <section className="bill-control-card">
-            <div>
+          <section className="bill-filter-panel">
+            <div className="bill-filter-field member-field">
               <label>Member</label>
 
               <select
@@ -490,7 +659,7 @@ function MemberBill() {
                     event.target.value
                   );
 
-                  resetResult();
+                  handleFilterChange();
                 }}
               >
                 <option value="">
@@ -515,7 +684,7 @@ function MemberBill() {
               </select>
             </div>
 
-            <div>
+            <div className="bill-filter-field">
               <label>Bill Month</label>
 
               <input
@@ -526,12 +695,12 @@ function MemberBill() {
                     event.target.value
                   );
 
-                  resetResult();
+                  handleFilterChange();
                 }}
               />
             </div>
 
-            <div>
+            <div className="bill-filter-field">
               <label>Bill Cycle</label>
 
               <select
@@ -541,360 +710,330 @@ function MemberBill() {
                     event.target.value
                   );
 
-                  resetResult();
+                  handleFilterChange();
                 }}
               >
                 <option value="1">
-                  Cycle 1: 1–10
+                  Cycle 1 · 1–10
                 </option>
 
                 <option value="2">
-                  Cycle 2: 11–20
+                  Cycle 2 · 11–20
                 </option>
 
                 <option value="3">
-                  Cycle 3: 21–Month End
+                  Cycle 3 · 21–Month End
                 </option>
               </select>
             </div>
 
-            <div>
-              <label>
-                Feed Due (₹)
-              </label>
+            <div className="bill-period-display">
+              <span>Selected Period</span>
 
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={feedDue}
-                onChange={(event) => {
-                  setFeedDue(
-                    event.target.value
-                  );
-
-                  resetResult();
-                }}
-              />
+              <strong>
+                {
+                  billingPeriod.fromDate
+                }{" "}
+                to{" "}
+                {billingPeriod.toDate}
+              </strong>
             </div>
-
-            <div>
-              <label>
-                Advance Due (₹)
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={advanceDue}
-                onChange={(event) => {
-                  setAdvanceDue(
-                    event.target.value
-                  );
-
-                  resetResult();
-                }}
-              />
-            </div>
-
-            <div>
-              <label>
-                Other Deduction (₹)
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={
-                  otherDeduction
-                }
-                onChange={(event) => {
-                  setOtherDeduction(
-                    event.target.value
-                  );
-
-                  resetResult();
-                }}
-              />
-            </div>
-
-            <div>
-              <label>
-                Reserve (%)
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={
-                  reservePercent
-                }
-                onChange={(event) => {
-                  setReservePercent(
-                    event.target.value
-                  );
-
-                  resetResult();
-                }}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="bill-primary-button"
-              disabled={actionLoading}
-              onClick={handlePreview}
-            >
-              {actionLoading
-                ? "Please wait..."
-                : "Calculate Preview"}
-            </button>
           </section>
 
-          {billPreview && (
+          {!selectedMemberId ? (
+            <section className="bill-empty-state">
+              <div>🧾</div>
+
+              <h2>
+                Select a member
+              </h2>
+
+              <p>
+                Choose a member, month and
+                billing cycle to view the
+                milk collection preview.
+              </p>
+            </section>
+          ) : previewCollections.length ===
+            0 ? (
+            <section className="bill-empty-state">
+              <div>🥛</div>
+
+              <h2>
+                No collection found
+              </h2>
+
+              <p>
+                There are no milk entries
+                for this member in the
+                selected billing period.
+              </p>
+            </section>
+          ) : (
             <>
-              <section className="bill-preview-document">
-                <div className="bill-preview-header">
-                  <div>
-                    <span>
-                      Dairy Management System
-                    </span>
-
-                    <h2>
-                      Milk Collection Bill
-                    </h2>
-                  </div>
-
-                  <div>
-                    <small>
-                      Bill Period
-                    </small>
-
-                    <strong>
-                      {
-                        billPreview.periodFrom
-                      }{" "}
-                      to{" "}
-                      {
-                        billPreview.periodTo
-                      }
-                    </strong>
-                  </div>
+              <section className="bill-member-profile">
+                <div className="bill-member-avatar">
+                  {selectedMember?.name
+                    ?.charAt(0)
+                    .toUpperCase()}
                 </div>
 
-                <div className="bill-member-summary">
-                  <div>
-                    <span>Member ID</span>
-                    <strong>
-                      {
-                        billPreview.memberId
-                      }
-                    </strong>
-                  </div>
+                <div>
+                  <span>
+                    Member details
+                  </span>
 
-                  <div>
-                    <span>Member</span>
-                    <strong>
-                      {
-                        billPreview.memberName
-                      }
-                    </strong>
-                  </div>
+                  <h2>
+                    {selectedMember?.name}
+                  </h2>
 
-                  <div>
-                    <span>Village</span>
-                    <strong>
-                      {billPreview.village ||
-                        "-"}
-                    </strong>
-                  </div>
+                  <p>
+                    Member ID:{" "}
+                    {
+                      selectedMember?.memberId
+                    }
+                    {selectedMember?.village
+                      ? ` · ${selectedMember.village}`
+                      : ""}
+                  </p>
+                </div>
+              </section>
 
-                  <div>
-                    <span>
-                      Collections
-                    </span>
-                    <strong>
-                      {
-                        billPreview.collectionCount
-                      }
-                    </strong>
-                  </div>
+              <section className="bill-summary-cards">
+                <div>
+                  <span>
+                    🐄 Cow Milk
+                  </span>
+
+                  <strong>
+                    {
+                      collectionSummary.cowMilk
+                    }{" "}
+                    L
+                  </strong>
+
+                  <small>
+                    ₹
+                    {formatAmount(
+                      collectionSummary.cowAmount
+                    )}
+                  </small>
                 </div>
 
-                <div className="bill-total-grid">
-                  <div>
-                    <span>Cow Milk</span>
-                    <strong>
-                      {
-                        billPreview.cowMilk
-                      }{" "}
-                      L
-                    </strong>
-                    <small>
-                      ₹
-                      {formatAmount(
-                        billPreview.cowAmount
-                      )}
-                    </small>
-                  </div>
+                <div>
+                  <span>
+                    🐃 Buffalo Milk
+                  </span>
 
-                  <div>
-                    <span>
-                      Buffalo Milk
-                    </span>
-                    <strong>
-                      {
-                        billPreview.buffaloMilk
-                      }{" "}
-                      L
-                    </strong>
-                    <small>
-                      ₹
-                      {formatAmount(
-                        billPreview.buffaloAmount
-                      )}
-                    </small>
-                  </div>
+                  <strong>
+                    {
+                      collectionSummary.buffaloMilk
+                    }{" "}
+                    L
+                  </strong>
 
-                  <div>
-                    <span>Total Milk</span>
-                    <strong>
-                      {
-                        billPreview.totalMilk
-                      }{" "}
-                      L
-                    </strong>
-                    <small>
-                      Avg FAT{" "}
-                      {
-                        billPreview.averageFat
-                      }{" "}
-                      / SNF{" "}
-                      {
-                        billPreview.averageSnf
-                      }
-                    </small>
-                  </div>
-
-                  <div className="bill-highlight-card">
-                    <span>
-                      Milk Amount
-                    </span>
-                    <strong>
-                      ₹
-                      {formatAmount(
-                        billPreview.milkAmount
-                      )}
-                    </strong>
-                  </div>
+                  <small>
+                    ₹
+                    {formatAmount(
+                      collectionSummary.buffaloAmount
+                    )}
+                  </small>
                 </div>
 
-                <div className="bill-calculation-grid">
-                  <div>
-                    <span>
-                      Feed Deducted
-                    </span>
-                    <strong>
-                      - ₹
-                      {formatAmount(
-                        billPreview.feedDeducted
-                      )}
-                    </strong>
-                  </div>
+                <div>
+                  <span>
+                    🥛 Total Milk
+                  </span>
 
-                  <div>
-                    <span>
-                      Advance Deducted
-                    </span>
-                    <strong>
-                      - ₹
-                      {formatAmount(
-                        billPreview.advanceDeducted
-                      )}
-                    </strong>
-                  </div>
+                  <strong>
+                    {
+                      collectionSummary.totalMilk
+                    }{" "}
+                    L
+                  </strong>
 
-                  <div>
-                    <span>
-                      Other Deduction
-                    </span>
-                    <strong>
-                      - ₹
-                      {formatAmount(
-                        billPreview.otherDeduction
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Reserve
-                    </span>
-                    <strong>
-                      - ₹
-                      {formatAmount(
-                        billPreview.reserveAmount
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Total Deduction
-                    </span>
-                    <strong>
-                      ₹
-                      {formatAmount(
-                        billPreview.totalDeduction
-                      )}
-                    </strong>
-                  </div>
-
-                  <div className="bill-net-card">
-                    <span>
-                      Net Payable
-                    </span>
-                    <strong>
-                      ₹
-                      {formatAmount(
-                        billPreview.netPayable
-                      )}
-                    </strong>
-                  </div>
+                  <small>
+                    {
+                      previewCollections.length
+                    }{" "}
+                    collection entries
+                  </small>
                 </div>
 
-                <h3>
-                  Collection Items
-                </h3>
+                <div className="bill-total-amount-card">
+                  <span>
+                    Milk Amount
+                  </span>
+
+                  <strong>
+                    ₹
+                    {formatAmount(
+                      collectionSummary.totalAmount
+                    )}
+                  </strong>
+
+                  <small>
+                    FAT{" "}
+                    {
+                      collectionSummary.averageFat
+                    }{" "}
+                    · SNF{" "}
+                    {
+                      collectionSummary.averageSnf
+                    }
+                  </small>
+                </div>
+              </section>
+
+              <section className="bill-session-grid">
+                {renderCollectionTable(
+                  "Cow Morning",
+                  "Cow",
+                  "Morning"
+                )}
 
                 {renderCollectionTable(
-                  billPreview.collections
+                  "Cow Evening",
+                  "Cow",
+                  "Evening"
+                )}
+
+                {renderCollectionTable(
+                  "Buffalo Morning",
+                  "Buffalo",
+                  "Morning"
+                )}
+
+                {renderCollectionTable(
+                  "Buffalo Evening",
+                  "Buffalo",
+                  "Evening"
                 )}
               </section>
 
-              <div className="bill-save-actions">
+              {generatedBill && (
+                <section className="generated-bill-summary">
+                  <div className="generated-bill-heading">
+                    <div>
+                      <span>
+                        Generated Bill
+                      </span>
+
+                      <h2>
+                        {
+                          generatedBill.billNumber
+                        }
+                      </h2>
+                    </div>
+
+                    <span className="bill-status-badge">
+                      {
+                        generatedBill.status
+                      }
+                    </span>
+                  </div>
+
+                  <div className="generated-calculation-grid">
+                    <div>
+                      <span>
+                        Milk Amount
+                      </span>
+
+                      <strong>
+                        ₹
+                        {formatAmount(
+                          generatedBill.milkAmount
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Feed Deduction
+                      </span>
+
+                      <strong>
+                        - ₹
+                        {formatAmount(
+                          generatedBill.feedDeducted
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Advance Deduction
+                      </span>
+
+                      <strong>
+                        - ₹
+                        {formatAmount(
+                          generatedBill.advanceDeducted
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Reserve Amount
+                      </span>
+
+                      <strong>
+                        - ₹
+                        {formatAmount(
+                          generatedBill.reserveAmount
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Total Deduction
+                      </span>
+
+                      <strong>
+                        ₹
+                        {formatAmount(
+                          generatedBill.totalDeduction
+                        )}
+                      </strong>
+                    </div>
+
+                    <div className="net-payable-result">
+                      <span>
+                        Net Payable
+                      </span>
+
+                      <strong>
+                        ₹
+                        {formatAmount(
+                          generatedBill.netPayable
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <div className="member-bill-actions">
                 <button
                   type="button"
-                  className="bill-primary-button"
+                  className="generate-member-bill-button"
                   disabled={actionLoading}
                   onClick={
                     handleGenerateBill
                   }
                 >
-                  {generatedBill
-                    ? "Update Saved Bill"
-                    : billPreview.existing
-                      ? "Update Existing Bill"
-                      : "Generate and Save Bill"}
+                  {actionLoading
+                    ? "Generating Bill..."
+                    : generatedBill
+                      ? "Regenerate Bill"
+                      : "Generate Member Bill"}
                 </button>
 
                 <button
                   type="button"
-                  className="bill-secondary-button"
+                  className="print-member-bill-button"
                   onClick={() =>
                     window.print()
                   }
