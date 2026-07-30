@@ -1,6 +1,7 @@
 const express = require("express");
 
 const {
+ 
   generateBill,
   generateAllBills,
   getAllBills,
@@ -14,12 +15,17 @@ const {
   "../controllers/billController"
 );
 
-const router =
-  express.Router();
+const router = express.Router();
 
 /*
-  Static routes must come before /:id.
+  Static routes must always come before
+  dynamic routes such as /:id.
 */
+
+/*
+  POST /api/bills/preview
+*/
+
 
 /*
   POST /api/bills/generate

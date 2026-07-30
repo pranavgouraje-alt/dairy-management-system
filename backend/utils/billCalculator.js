@@ -1,4 +1,3 @@
-
 function toNumber(value) {
   const numberValue = Number(value);
 
@@ -7,319 +6,16 @@ function toNumber(value) {
     : 0;
 }
 
-
 function roundAmount(value) {
   return Number(
     toNumber(value).toFixed(2)
   );
 }
 
-
-function calculateWeightedAverage(
-  records,
-  fieldName
-) {
-  const totalQuantity = records.reduce(
-    (sum, record) =>
-      sum + toNumber(record.quantity),
-    0
-  );
-
-  if (totalQuantity <= 0) {
-    return 0;
-  }
-
-  const weightedTotal = records.reduce(
-    (sum, record) =>
-      sum +
-      toNumber(record.quantity) *
-        toNumber(record[fieldName]),
-    0
-  );
-
-  return roundAmount(
-    weightedTotal / totalQuantity
-  );
-}
-
-
-function calculateMilkSummary(
-  collections = []
-) {
-  const initialSummary = {
-    cowMilk: 0,
-    buffaloMilk: 0,
-    totalMilk: 0,
-
-    cowAmount: 0,
-    buffaloAmount: 0,
-    milkAmount: 0,
-
-    averageFat: 0,
-    averageSnf: 0,
-
-    cowMorningMilk: 0,
-    cowEveningMilk: 0,
-
-    buffaloMorningMilk: 0,
-    buffaloEveningMilk: 0,
-
-    collectionCount: 0,
-  };
-
-  const summary = collections.reduce(
-    (result, collection) => {
-      const quantity = toNumber(
-        collection.quantity
-      );
-
-      const amount = toNumber(
-        collection.amount
-      );
-
-      result.totalMilk += quantity;
-      result.milkAmount += amount;
-      result.collectionCount += 1;
-
-      if (
-        collection.milk_type === "Cow"
-      ) {
-        result.cowMilk += quantity;
-        result.cowAmount += amount;
-
-        if (
-          collection.session ===
-          "Morning"
-        ) {
-          result.cowMorningMilk +=
-            quantity;
-        } else {
-          result.cowEveningMilk +=
-            quantity;
-        }
-      }
-
-      if (
-        collection.milk_type ===
-        "Buffalo"
-      ) {
-        result.buffaloMilk +=
-          quantity;
-
-        result.buffaloAmount +=
-          amount;
-
-        if (
-          collection.session ===
-          "Morning"
-        ) {
-          result.buffaloMorningMilk +=
-            quantity;
-        } else {
-          result.buffaloEveningMilk +=
-            quantity;
-        }
-      }
-
-      return result;
-    },
-    initialSummary
-  );
-
-  summary.averageFat =
-    calculateWeightedAverage(
-      collections,
-      "fat"
-    );
-
-  summary.averageSnf =
-    calculateWeightedAverage(
-      collections,
-      "snf"
-    );
-
-  Object.keys(summary).forEach(
-    (key) => {
-      if (
-        key !== "collectionCount"
-      ) {
-        summary[key] = roundAmount(
-          summary[key]
-        );
-      }
-    }
-  );
-
-  return summary;
-}
-
-
-function calculateAvailableDeduction(
-  dueAmount,
-  availableAmount
-) {
-  const due = Math.max(
-    0,
-    toNumber(dueAmount)
-  );
-
-  const available = Math.max(
-    0,
-    toNumber(availableAmount)
-  );
-
-  return roundAmount(
-    Math.min(due, available)
-  );
-}
-
-
-function calculateBillTotals({
-  milkAmount,
-  feedDue = 0,
-  advanceDue = 0,
-  otherDeduction = 0,
-  reservePercent = 10,
-}) {
-  const safeMilkAmount = Math.max(
-    0,
-    toNumber(milkAmount)
-  );
-
-  const safeReservePercent =
-    Math.max(
-      0,
-      toNumber(reservePercent)
-    );
-
-  const reserveAmount = roundAmount(
-    safeMilkAmount *
-      (safeReservePercent / 100)
-  );
-
-  let availableAmount = roundAmount(
-    safeMilkAmount - reserveAmount
-  );
-
-  const feedDeducted =
-    calculateAvailableDeduction(
-      feedDue,
-      availableAmount
-    );
-
-  availableAmount = roundAmount(
-    availableAmount - feedDeducted
-  );
-
-  const advanceDeducted =
-    calculateAvailableDeduction(
-      advanceDue,
-      availableAmount
-    );
-
-  availableAmount = roundAmount(
-    availableAmount -
-      advanceDeducted
-  );
-
-  const safeOtherDeduction =
-    calculateAvailableDeduction(
-      otherDeduction,
-      availableAmount
-    );
-
-  availableAmount = roundAmount(
-    availableAmount -
-      safeOtherDeduction
-  );
-
-  const totalDeduction = roundAmount(
-    reserveAmount +
-      feedDeducted +
-      advanceDeducted +
-      safeOtherDeduction
-  );
-
-  const netPayable = roundAmount(
-    Math.max(
-      0,
-      safeMilkAmount -
-        totalDeduction
-    )
-  );
-
-  const remainingFeedDue =
-    roundAmount(
-      Math.max(
-        0,
-        toNumber(feedDue) -
-          feedDeducted
-      )
-    );
-
-  const remainingAdvanceDue =
-    roundAmount(
-      Math.max(
-        0,
-        toNumber(advanceDue) -
-          advanceDeducted
-      )
-    );
-
-  return {
-    milkAmount:
-      roundAmount(safeMilkAmount),
-
-    reservePercent:
-      roundAmount(
-        safeReservePercent
-      ),
-
-    reserveAmount,
-
-    feedDue:
-      roundAmount(feedDue),
-
-    feedDeducted,
-
-    remainingFeedDue,
-
-    advanceDue:
-      roundAmount(advanceDue),
-
-    advanceDeducted,
-
-    remainingAdvanceDue,
-
-    otherDeduction:
-      safeOtherDeduction,
-
-    totalDeduction,
-
-    netPayable,
-
-    paidAmount: 0,
-
-    balanceAmount: netPayable,
-
-    status:
-      netPayable > 0
-        ? "Pending"
-        : "Paid",
-  };
-}
-
-
-function getBillingPeriod(
-  billMonth,
-  billCycle
-) {
-  const monthPattern =
-    /^\d{4}-\d{2}$/;
-
+function validateBillMonth(billMonth) {
   if (
-    !monthPattern.test(
-      String(billMonth)
+    !/^\d{4}-\d{2}$/.test(
+      String(billMonth || "")
     )
   ) {
     throw new Error(
@@ -327,9 +23,24 @@ function getBillingPeriod(
     );
   }
 
-  const cycle = Number(
-    billCycle
+  const month = Number(
+    String(billMonth).split("-")[1]
   );
+
+  if (month < 1 || month > 12) {
+    throw new Error(
+      "Bill month is invalid"
+    );
+  }
+}
+
+function getBillingPeriod(
+  billMonth,
+  billCycle
+) {
+  validateBillMonth(billMonth);
+
+  const cycle = Number(billCycle);
 
   if (![1, 2, 3].includes(cycle)) {
     throw new Error(
@@ -337,101 +48,331 @@ function getBillingPeriod(
     );
   }
 
-  const [
-    year,
-    monthNumber,
-  ] = billMonth
-    .split("-")
-    .map(Number);
+  const [yearText, monthText] =
+    billMonth.split("-");
 
-  const lastDay = new Date(
-    year,
-    monthNumber,
-    0
-  ).getDate();
+  const year = Number(yearText);
+  const month = Number(monthText);
 
-  let startDay;
-  let endDay;
+  let fromDay = 1;
+  let toDay = 10;
 
-  if (cycle === 1) {
-    startDay = 1;
-    endDay = 10;
-  } else if (cycle === 2) {
-    startDay = 11;
-    endDay = 20;
-  } else {
-    startDay = 21;
-    endDay = lastDay;
+  if (cycle === 2) {
+    fromDay = 11;
+    toDay = 20;
   }
 
-  const formatDay = (day) =>
-    String(day).padStart(2, "0");
+  if (cycle === 3) {
+    fromDay = 21;
+    toDay = new Date(
+      year,
+      month,
+      0
+    ).getDate();
+  }
+
+  const fromDate =
+    `${yearText}-${monthText}-${String(
+      fromDay
+    ).padStart(2, "0")}`;
+
+  const toDate =
+    `${yearText}-${monthText}-${String(
+      toDay
+    ).padStart(2, "0")}`;
 
   return {
     billMonth,
-
     billCycle: cycle,
-
-    fromDate:
-      `${billMonth}-${formatDay(
-        startDay
-      )}`,
-
-    toDate:
-      `${billMonth}-${formatDay(
-        endDay
-      )}`,
-
-    cycleLabel:
-      cycle === 1
-        ? "Cycle 1: 1–10"
-        : cycle === 2
-          ? "Cycle 2: 11–20"
-          : `Cycle 3: 21–${lastDay}`,
+    fromDate,
+    toDate,
   };
 }
 
+function calculateMilkSummary(
+  collections = []
+) {
+  const summary = {
+    cowMilk: 0,
+    buffaloMilk: 0,
+    totalMilk: 0,
+    cowAmount: 0,
+    buffaloAmount: 0,
+    milkAmount: 0,
+    averageFat: 0,
+    averageSnf: 0,
+  };
+
+  let totalFatWeight = 0;
+  let totalSnfWeight = 0;
+
+  for (const collection of collections) {
+    const quantity = toNumber(
+      collection.quantity
+    );
+
+    const amount = toNumber(
+      collection.amount
+    );
+
+    const fat = toNumber(
+      collection.fat
+    );
+
+    const snf = toNumber(
+      collection.snf
+    );
+
+    if (
+      String(
+        collection.milk_type ||
+        collection.milkType
+      ).toLowerCase() === "cow"
+    ) {
+      summary.cowMilk += quantity;
+      summary.cowAmount += amount;
+    } else {
+      summary.buffaloMilk += quantity;
+      summary.buffaloAmount += amount;
+    }
+
+    summary.totalMilk += quantity;
+    summary.milkAmount += amount;
+
+    totalFatWeight += fat * quantity;
+    totalSnfWeight += snf * quantity;
+  }
+
+  summary.averageFat =
+    summary.totalMilk > 0
+      ? totalFatWeight /
+        summary.totalMilk
+      : 0;
+
+  summary.averageSnf =
+    summary.totalMilk > 0
+      ? totalSnfWeight /
+        summary.totalMilk
+      : 0;
+
+  return {
+    cowMilk:
+      roundAmount(summary.cowMilk),
+
+    buffaloMilk:
+      roundAmount(
+        summary.buffaloMilk
+      ),
+
+    totalMilk:
+      roundAmount(summary.totalMilk),
+
+    cowAmount:
+      roundAmount(summary.cowAmount),
+
+    buffaloAmount:
+      roundAmount(
+        summary.buffaloAmount
+      ),
+
+    milkAmount:
+      roundAmount(summary.milkAmount),
+
+    averageFat:
+      roundAmount(summary.averageFat),
+
+    averageSnf:
+      roundAmount(summary.averageSnf),
+  };
+}
+
+function calculateBillTotals({
+  milkAmount,
+  feedDue = 0,
+  advanceDue = 0,
+  otherDeduction = 0,
+  reservePercent = 0,
+}) {
+  const grossAmount = Math.max(
+    roundAmount(milkAmount),
+    0
+  );
+
+  const safeFeedDue = Math.max(
+    roundAmount(feedDue),
+    0
+  );
+
+  const safeAdvanceDue = Math.max(
+    roundAmount(advanceDue),
+    0
+  );
+
+  const safeOtherDeduction = Math.max(
+    roundAmount(otherDeduction),
+    0
+  );
+
+  const safeReservePercent =
+    Math.min(
+      Math.max(
+        roundAmount(reservePercent),
+        0
+      ),
+      100
+    );
+
+  let availableAmount = grossAmount;
+
+  const feedDeducted = Math.min(
+    safeFeedDue,
+    availableAmount
+  );
+
+  availableAmount = roundAmount(
+    availableAmount - feedDeducted
+  );
+
+  const advanceDeducted = Math.min(
+    safeAdvanceDue,
+    availableAmount
+  );
+
+  availableAmount = roundAmount(
+    availableAmount -
+      advanceDeducted
+  );
+
+  const otherDeducted = Math.min(
+    safeOtherDeduction,
+    availableAmount
+  );
+
+  availableAmount = roundAmount(
+    availableAmount -
+      otherDeducted
+  );
+
+  const requestedReserve = roundAmount(
+    grossAmount *
+      (safeReservePercent / 100)
+  );
+
+  const reserveAmount = Math.min(
+    requestedReserve,
+    availableAmount
+  );
+
+  availableAmount = roundAmount(
+    availableAmount -
+      reserveAmount
+  );
+
+  const totalDeduction = roundAmount(
+    feedDeducted +
+      advanceDeducted +
+      otherDeducted +
+      reserveAmount
+  );
+
+  const netPayable = roundAmount(
+    Math.max(
+      grossAmount - totalDeduction,
+      0
+    )
+  );
+
+  return {
+    milkAmount: grossAmount,
+
+    feedDue: safeFeedDue,
+    feedDeducted:
+      roundAmount(feedDeducted),
+    remainingFeedDue:
+      roundAmount(
+        safeFeedDue - feedDeducted
+      ),
+
+    advanceDue: safeAdvanceDue,
+    advanceDeducted:
+      roundAmount(advanceDeducted),
+    remainingAdvanceDue:
+      roundAmount(
+        safeAdvanceDue -
+          advanceDeducted
+      ),
+
+    otherDeduction:
+      roundAmount(otherDeducted),
+
+    reservePercent:
+      safeReservePercent,
+    reserveAmount:
+      roundAmount(reserveAmount),
+
+    totalDeduction,
+    netPayable,
+    paidAmount: 0,
+    balanceAmount: netPayable,
+    status:
+      netPayable > 0
+        ? "Pending"
+        : "Paid",
+  };
+}
 
 function generateBillNumber({
   billMonth,
   billCycle,
   memberId,
 }) {
-  const cleanMonth =
-    String(billMonth).replace(
-      "-",
-      ""
-    );
+  const compactMonth =
+    String(billMonth).replace("-", "");
 
   const cleanMemberId =
-    String(memberId).replace(
-      /[^a-zA-Z0-9]/g,
-      ""
-    );
+    String(memberId)
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toUpperCase();
+
+  const stamp = Date.now()
+    .toString()
+    .slice(-6);
 
   return [
     "BILL",
-    cleanMonth,
+    compactMonth,
     `C${billCycle}`,
-    `M${cleanMemberId}`,
-    Date.now(),
+    cleanMemberId,
+    stamp,
   ].join("-");
 }
 
 function generatePaymentNumber() {
-  return `PAY-${Date.now()}-${Math.floor(
-    Math.random() * 1000
-  )}`;
+  const date = new Date();
+
+  const year = date.getFullYear();
+
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0");
+
+  const stamp = Date.now()
+    .toString()
+    .slice(-6);
+
+  return `PAY-${year}${month}${day}-${stamp}`;
 }
 
 module.exports = {
   toNumber,
   roundAmount,
-  calculateWeightedAverage,
-  calculateMilkSummary,
-  calculateAvailableDeduction,
-  calculateBillTotals,
   getBillingPeriod,
+  calculateMilkSummary,
+  calculateBillTotals,
   generateBillNumber,
   generatePaymentNumber,
 };

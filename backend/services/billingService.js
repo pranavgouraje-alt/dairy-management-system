@@ -12,33 +12,6 @@ const {
   "../utils/billCalculator"
 );
 
-/*
-  Checks whether a table exists in the
-  currently connected database.
-*/
-async function tableExists(
-  connection,
-  tableName
-) {
-  const [rows] =
-    await connection.execute(
-      `
-        SELECT COUNT(*) AS total
-        FROM information_schema.tables
-        WHERE table_schema = DATABASE()
-          AND table_name = ?
-      `,
-      [tableName]
-    );
-
-  return Number(
-    rows[0].total
-  ) > 0;
-}
-
-/*
-  Loads one member.
-*/
 async function getMember(
   connection,
   memberId
@@ -62,9 +35,6 @@ async function getMember(
   return rows[0] || null;
 }
 
-/*
-  Loads active members.
-*/
 async function getActiveMembers(
   connection
 ) {
@@ -88,16 +58,17 @@ async function getActiveMembers(
   return rows;
 }
 
-/*
-  Loads milk collections for one member
-  and one billing period.
-*/
 async function getMemberCollections(
   connection,
   memberId,
   fromDate,
-  toDate
+  toDate,
+  lockRows = false
 ) {
+  const lockClause = lockRows
+    ? "FOR UPDATE"
+    : "";
+
   const [rows] =
     await connection.execute(
       `
@@ -138,6 +109,8 @@ async function getMemberCollections(
           ),
           collection_time ASC,
           collection_id ASC
+
+        ${lockClause}
       `,
       [
         memberId,
@@ -149,119 +122,6 @@ async function getMemberCollections(
   return rows;
 }
 
-/*
-  Loads the total pending feed balance.
-
-  Supports the Day 61 feed_records design.
-
-  When the table has not yet been migrated
-  to MySQL, it returns zero.
-*/
-async function getPendingFeedDue(
-  connection,
-  memberId
-) {
-  const exists =
-    await tableExists(
-      connection,
-      "feed_records"
-    );
-
-  if (!exists) {
-    return 0;
-  }
-
-  try {
-    const [rows] =
-      await connection.execute(
-        `
-          SELECT
-            COALESCE(
-              SUM(remaining_amount),
-              0
-            ) AS feed_due
-          FROM feed_records
-          WHERE member_id = ?
-            AND status NOT IN (
-              'Paid',
-              'Deducted'
-            )
-        `,
-        [memberId]
-      );
-
-    return roundAmount(
-      rows[0].feed_due
-    );
-  } catch (error) {
-    console.warn(
-      "Feed deduction query skipped:",
-      error.message
-    );
-
-    return 0;
-  }
-}
-
-/*
-  Loads pending advance balance.
-
-  Supports an advances table containing
-  remaining_amount.
-
-  When the table is unavailable, returns 0.
-*/
-async function getPendingAdvanceDue(
-  connection,
-  memberId
-) {
-  const exists =
-    await tableExists(
-      connection,
-      "advances"
-    );
-
-  if (!exists) {
-    return 0;
-  }
-
-  try {
-    const [rows] =
-      await connection.execute(
-        `
-          SELECT
-            COALESCE(
-              SUM(remaining_amount),
-              0
-            ) AS advance_due
-          FROM advances
-          WHERE member_id = ?
-            AND status NOT IN (
-              'Paid',
-              'Cleared',
-              'Deducted'
-            )
-        `,
-        [memberId]
-      );
-
-    return roundAmount(
-      rows[0].advance_due
-    );
-  } catch (error) {
-    console.warn(
-      "Advance deduction query skipped:",
-      error.message
-    );
-
-    return 0;
-  }
-}
-
-/*
-  Loads an existing bill for the member,
-  month and cycle.
-*/
 async function getExistingBill(
   connection,
   memberId,
@@ -288,10 +148,283 @@ async function getExistingBill(
   return rows[0] || null;
 }
 
-/*
-  Inserts all included collection rows
-  into bill_items.
-*/
+function mapCollection(collection) {
+  return {
+    collectionId:
+      String(collection.collection_id),
+
+    memberId:
+      String(collection.member_id),
+
+    collectionDate:
+      collection.collection_date,
+
+    collectionTime:
+      collection.collection_time,
+
+    milkType:
+      collection.milk_type,
+
+    session:
+      collection.session,
+
+    quantity:
+      Number(collection.quantity),
+
+    fat:
+      Number(collection.fat),
+
+    snf:
+      Number(collection.snf),
+
+    rate:
+      Number(collection.rate),
+
+    amount:
+      Number(collection.amount),
+  };
+}
+
+function createFlatBillResult({
+  billId = null,
+  billNumber = null,
+  member,
+  period,
+  collections,
+  milkSummary,
+  calculation,
+  paidAmount = 0,
+  status,
+  generated = false,
+  existing = false,
+}) {
+  const balanceAmount = roundAmount(
+    Math.max(
+      calculation.netPayable -
+        paidAmount,
+      0
+    )
+  );
+
+  return {
+    generated,
+    existing,
+
+    billId:
+      billId === null
+        ? null
+        : String(billId),
+
+    billNumber,
+
+    memberId:
+      String(member.member_id),
+
+    memberName:
+      member.name,
+
+    mobile:
+      member.mobile || "",
+
+    village:
+      member.village || "",
+
+    billMonth:
+      period.billMonth,
+
+    billCycle:
+      period.billCycle,
+
+    periodFrom:
+      period.fromDate,
+
+    periodTo:
+      period.toDate,
+
+    collectionCount:
+      collections.length,
+
+    collections:
+      collections.map(
+        mapCollection
+      ),
+
+    ...milkSummary,
+    ...calculation,
+
+    paidAmount:
+      roundAmount(paidAmount),
+
+    balanceAmount,
+
+    remainingDue:
+      roundAmount(
+        calculation.remainingFeedDue +
+          calculation.remainingAdvanceDue
+      ),
+
+    status:
+      status ||
+      (
+        balanceAmount <= 0
+          ? "Paid"
+          : paidAmount > 0
+            ? "Partially Paid"
+            : "Pending"
+      ),
+  };
+}
+
+async function calculateMemberBill({
+  connection,
+  memberId,
+  billMonth,
+  billCycle,
+  reservePercent = 10,
+  feedDue = 0,
+  advanceDue = 0,
+  otherDeduction = 0,
+  lockRows = false,
+}) {
+  const period = getBillingPeriod(
+    billMonth,
+    billCycle
+  );
+
+  const member = await getMember(
+    connection,
+    memberId
+  );
+
+  if (!member) {
+    const error = new Error(
+      `Member ${memberId} not found`
+    );
+
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const collections =
+    await getMemberCollections(
+      connection,
+      memberId,
+      period.fromDate,
+      period.toDate,
+      lockRows
+    );
+
+  if (collections.length === 0) {
+    return {
+      skipped: true,
+      reason:
+        "No milk collections found",
+      member,
+      period,
+      collections: [],
+    };
+  }
+
+  const milkSummary =
+    calculateMilkSummary(
+      collections
+    );
+
+  const calculation =
+    calculateBillTotals({
+      milkAmount:
+        milkSummary.milkAmount,
+
+      feedDue,
+      advanceDue,
+      otherDeduction,
+      reservePercent,
+    });
+
+  return {
+    skipped: false,
+    member,
+    period,
+    collections,
+    milkSummary,
+    calculation,
+  };
+}
+
+async function previewMemberBill(
+  options
+) {
+  const connection =
+    await pool.getConnection();
+
+  try {
+    const calculated =
+      await calculateMemberBill({
+        connection,
+        ...options,
+        lockRows: false,
+      });
+
+    if (calculated.skipped) {
+      return {
+        generated: false,
+        skipped: true,
+        reason:
+          calculated.reason,
+        member: calculated.member,
+        period: calculated.period,
+      };
+    }
+
+    const existingBill =
+      await getExistingBill(
+        connection,
+        options.memberId,
+        options.billMonth,
+        options.billCycle
+      );
+
+    return createFlatBillResult({
+      member:
+        calculated.member,
+
+      period:
+        calculated.period,
+
+      collections:
+        calculated.collections,
+
+      milkSummary:
+        calculated.milkSummary,
+
+      calculation:
+        calculated.calculation,
+
+      billId:
+        existingBill?.bill_id ||
+        null,
+
+      billNumber:
+        existingBill?.bill_number ||
+        null,
+
+      paidAmount:
+        roundAmount(
+          existingBill?.paid_amount
+        ),
+
+      status:
+        existingBill?.status,
+
+      generated: false,
+      existing:
+        Boolean(existingBill),
+    });
+  } finally {
+    connection.release();
+  }
+}
+
 async function replaceBillItems(
   connection,
   billId,
@@ -305,10 +438,7 @@ async function replaceBillItems(
     [billId]
   );
 
-  for (
-    const collection
-    of collections
-  ) {
+  for (const collection of collections) {
     await connection.execute(
       `
         INSERT INTO bill_items (
@@ -325,17 +455,8 @@ async function replaceBillItems(
           amount
         )
         VALUES (
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?
         )
       `,
       [
@@ -355,9 +476,6 @@ async function replaceBillItems(
   }
 }
 
-/*
-  Saves deduction summary rows.
-*/
 async function replaceBillDeductions(
   connection,
   billId,
@@ -371,80 +489,57 @@ async function replaceBillDeductions(
     [billId]
   );
 
-  const deductionRows = [
-    {
-      type: "Reserve",
-
-      description:
-        `${calculation.reservePercent}% reserve amount`,
-
-      dueAmount:
-        calculation.reserveAmount,
-
-      deductedAmount:
-        calculation.reserveAmount,
-
-      remainingAmount: 0,
-    },
-
+  const rows = [
     {
       type: "Feed",
-
       description:
-        "Pending cattle feed deduction",
-
+        "Cattle feed deduction",
       dueAmount:
         calculation.feedDue,
-
       deductedAmount:
         calculation.feedDeducted,
-
       remainingAmount:
         calculation.remainingFeedDue,
     },
-
     {
       type: "Advance",
-
       description:
-        "Pending advance deduction",
-
+        "Advance recovery",
       dueAmount:
         calculation.advanceDue,
-
       deductedAmount:
         calculation.advanceDeducted,
-
       remainingAmount:
-        calculation.remainingAdvanceDue,
+        calculation
+          .remainingAdvanceDue,
     },
-
     {
       type: "Other",
-
       description:
         "Other manual deduction",
-
       dueAmount:
         calculation.otherDeduction,
-
       deductedAmount:
         calculation.otherDeduction,
-
+      remainingAmount: 0,
+    },
+    {
+      type: "Reserve",
+      description:
+        `${calculation.reservePercent}% reserve amount`,
+      dueAmount:
+        calculation.reserveAmount,
+      deductedAmount:
+        calculation.reserveAmount,
       remainingAmount: 0,
     },
   ];
 
-  for (
-    const deduction
-    of deductionRows
-  ) {
+  for (const row of rows) {
     if (
+      Number(row.dueAmount) <= 0 &&
       Number(
-        deduction.dueAmount
-      ) <= 0 &&
-      Number(
-        deduction.deductedAmount
+        row.deductedAmount
       ) <= 0
     ) {
       continue;
@@ -462,114 +557,32 @@ async function replaceBillDeductions(
           remaining_amount
         )
         VALUES (
-          ?,
-          ?,
-          NULL,
-          ?,
-          ?,
-          ?,
-          ?
+          ?, ?, NULL, ?, ?, ?, ?
         )
       `,
       [
         billId,
-        deduction.type,
-        deduction.description,
-        deduction.dueAmount,
-        deduction.deductedAmount,
-        deduction.remainingAmount,
+        row.type,
+        row.description,
+        row.dueAmount,
+        row.deductedAmount,
+        row.remainingAmount,
       ]
     );
   }
 }
 
-/*
-  Creates or updates one member bill.
-
-  Existing payments are preserved.
-*/
-async function generateMemberBill({
+async function saveCalculatedBill({
   connection,
-  memberId,
-  billMonth,
-  billCycle,
-  reservePercent = 10,
-  otherDeduction = 0,
-  generatedBy = "System",
+  options,
+  calculated,
 }) {
-  const period = getBillingPeriod(
-    billMonth,
-    billCycle
-  );
-
-  const member =
-    await getMember(
-      connection,
-      memberId
-    );
-
-  if (!member) {
-    throw new Error(
-      `Member ${memberId} not found`
-    );
-  }
-
-  const collections =
-    await getMemberCollections(
-      connection,
-      memberId,
-      period.fromDate,
-      period.toDate
-    );
-
-  if (collections.length === 0) {
-    return {
-      generated: false,
-      skipped: true,
-      reason:
-        "No milk collections found",
-      member,
-      period,
-    };
-  }
-
-  const milkSummary =
-    calculateMilkSummary(
-      collections
-    );
-
-  const feedDue =
-    await getPendingFeedDue(
-      connection,
-      memberId
-    );
-
-  const advanceDue =
-    await getPendingAdvanceDue(
-      connection,
-      memberId
-    );
-
-  const billCalculation =
-    calculateBillTotals({
-      milkAmount:
-        milkSummary.milkAmount,
-
-      feedDue,
-
-      advanceDue,
-
-      otherDeduction,
-
-      reservePercent,
-    });
-
   const existingBill =
     await getExistingBill(
       connection,
-      memberId,
-      billMonth,
-      billCycle
+      options.memberId,
+      options.billMonth,
+      options.billCycle
     );
 
   let billId;
@@ -590,9 +603,10 @@ async function generateMemberBill({
     const balanceAmount =
       roundAmount(
         Math.max(
-          0,
-          billCalculation.netPayable -
-            paidAmount
+          calculated.calculation
+            .netPayable -
+            paidAmount,
+          0
         )
       );
 
@@ -644,50 +658,71 @@ async function generateMemberBill({
         WHERE bill_id = ?
       `,
       [
-        period.fromDate,
-        period.toDate,
+        calculated.period.fromDate,
+        calculated.period.toDate,
 
-        milkSummary.cowMilk,
-        milkSummary.buffaloMilk,
-        milkSummary.totalMilk,
+        calculated.milkSummary.cowMilk,
+        calculated.milkSummary
+          .buffaloMilk,
+        calculated.milkSummary
+          .totalMilk,
 
-        milkSummary.cowAmount,
-        milkSummary.buffaloAmount,
-        milkSummary.milkAmount,
+        calculated.milkSummary.cowAmount,
+        calculated.milkSummary
+          .buffaloAmount,
+        calculated.milkSummary
+          .milkAmount,
 
-        milkSummary.averageFat,
-        milkSummary.averageSnf,
+        calculated.milkSummary
+          .averageFat,
+        calculated.milkSummary
+          .averageSnf,
 
-        billCalculation.feedDue,
-        billCalculation.feedDeducted,
+        calculated.calculation.feedDue,
+        calculated.calculation
+          .feedDeducted,
 
-        billCalculation.advanceDue,
-        billCalculation.advanceDeducted,
+        calculated.calculation
+          .advanceDue,
+        calculated.calculation
+          .advanceDeducted,
 
-        billCalculation.otherDeduction,
+        calculated.calculation
+          .otherDeduction,
 
-        billCalculation.reservePercent,
-        billCalculation.reserveAmount,
+        calculated.calculation
+          .reservePercent,
+        calculated.calculation
+          .reserveAmount,
 
-        billCalculation.totalDeduction,
-        billCalculation.netPayable,
+        calculated.calculation
+          .totalDeduction,
+        calculated.calculation
+          .netPayable,
 
         balanceAmount,
         status,
 
-        generatedBy,
+        options.generatedBy ||
+          "System",
+
         billId,
       ]
     );
   } else {
     billNumber =
       generateBillNumber({
-        billMonth,
-        billCycle,
-        memberId,
+        billMonth:
+          options.billMonth,
+
+        billCycle:
+          options.billCycle,
+
+        memberId:
+          options.memberId,
       });
 
-    const [insertResult] =
+    const [result] =
       await connection.execute(
         `
           INSERT INTO bills (
@@ -730,129 +765,169 @@ async function generateMemberBill({
             generated_by
           )
           VALUES (
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?,
+            ?, ?,
+            ?, ?,
+            ?, ?,
             ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-
-            ?,
-            ?,
-            ?,
-
-            ?,
-            ?,
-            ?,
-
-            ?,
-            ?,
-
-            ?,
-            ?,
-
-            ?,
-            ?,
-
-            ?,
-
-            ?,
-            ?,
-
-            ?,
-            ?,
-
-            0,
-            ?,
-
-            ?,
-            ?
+            ?, ?,
+            ?, ?,
+            0, ?,
+            ?, ?
           )
         `,
         [
           billNumber,
-          memberId,
-          billMonth,
-          billCycle,
-          period.fromDate,
-          period.toDate,
+          options.memberId,
+          options.billMonth,
+          Number(
+            options.billCycle
+          ),
+          calculated.period.fromDate,
+          calculated.period.toDate,
 
-          milkSummary.cowMilk,
-          milkSummary.buffaloMilk,
-          milkSummary.totalMilk,
+          calculated.milkSummary.cowMilk,
+          calculated.milkSummary
+            .buffaloMilk,
+          calculated.milkSummary
+            .totalMilk,
 
-          milkSummary.cowAmount,
-          milkSummary.buffaloAmount,
-          milkSummary.milkAmount,
+          calculated.milkSummary.cowAmount,
+          calculated.milkSummary
+            .buffaloAmount,
+          calculated.milkSummary
+            .milkAmount,
 
-          milkSummary.averageFat,
-          milkSummary.averageSnf,
+          calculated.milkSummary
+            .averageFat,
+          calculated.milkSummary
+            .averageSnf,
 
-          billCalculation.feedDue,
-          billCalculation.feedDeducted,
+          calculated.calculation.feedDue,
+          calculated.calculation
+            .feedDeducted,
 
-          billCalculation.advanceDue,
-          billCalculation.advanceDeducted,
+          calculated.calculation
+            .advanceDue,
+          calculated.calculation
+            .advanceDeducted,
 
-          billCalculation.otherDeduction,
+          calculated.calculation
+            .otherDeduction,
 
-          billCalculation.reservePercent,
-          billCalculation.reserveAmount,
+          calculated.calculation
+            .reservePercent,
+          calculated.calculation
+            .reserveAmount,
 
-          billCalculation.totalDeduction,
-          billCalculation.netPayable,
+          calculated.calculation
+            .totalDeduction,
+          calculated.calculation
+            .netPayable,
 
-          billCalculation.balanceAmount,
+          calculated.calculation
+            .netPayable,
 
-          billCalculation.status,
-          generatedBy,
+          calculated.calculation.status,
+
+          options.generatedBy ||
+            "System",
         ]
       );
 
-    billId =
-      insertResult.insertId;
+    billId = result.insertId;
   }
 
   await replaceBillItems(
     connection,
     billId,
-    collections
+    calculated.collections
   );
 
   await replaceBillDeductions(
     connection,
     billId,
-    billCalculation
+    calculated.calculation
   );
 
-  return {
-    generated: true,
-    skipped: false,
-
-    billId:
-      String(billId),
-
+  return createFlatBillResult({
+    billId,
     billNumber,
 
-    member,
+    member:
+      calculated.member,
 
-    period,
+    period:
+      calculated.period,
 
-    collectionCount:
-      collections.length,
+    collections:
+      calculated.collections,
 
-    milkSummary,
+    milkSummary:
+      calculated.milkSummary,
 
-    calculation: {
-      ...billCalculation,
-      paidAmount,
-    },
-  };
+    calculation:
+      calculated.calculation,
+
+    paidAmount,
+
+    generated: true,
+    existing:
+      Boolean(existingBill),
+  });
 }
 
-/*
-  Generates bills for all active members.
-*/
+async function generateSingleMemberBill(
+  options
+) {
+  const connection =
+    await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const calculated =
+      await calculateMemberBill({
+        connection,
+        ...options,
+        lockRows: true,
+      });
+
+    if (calculated.skipped) {
+      await connection.rollback();
+
+      return {
+        generated: false,
+        skipped: true,
+        reason:
+          calculated.reason,
+        member:
+          calculated.member,
+        period:
+          calculated.period,
+      };
+    }
+
+    const result =
+      await saveCalculatedBill({
+        connection,
+        options,
+        calculated,
+      });
+
+    await connection.commit();
+
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function generateAllMemberBills({
   billMonth,
   billCycle,
@@ -864,8 +939,6 @@ async function generateAllMemberBills({
     await pool.getConnection();
 
   try {
-    await connection.beginTransaction();
-
     const members =
       await getActiveMembers(
         connection
@@ -875,26 +948,21 @@ async function generateAllMemberBills({
     const skippedMembers = [];
     const failedMembers = [];
 
-    for (
-      const member
-      of members
-    ) {
+    for (const member of members) {
       try {
         const result =
-          await generateMemberBill({
-            connection,
-
+          await generateSingleMemberBill({
             memberId:
               member.member_id,
 
             billMonth,
-
             billCycle,
-
             reservePercent,
 
-            otherDeduction,
+            feedDue: 0,
+            advanceDue: 0,
 
+            otherDeduction,
             generatedBy,
           });
 
@@ -928,73 +996,32 @@ async function generateAllMemberBills({
       }
     }
 
-    await connection.commit();
-
     return {
       success: true,
-
       totalMembers:
         members.length,
-
       generatedCount:
         generatedBills.length,
-
       skippedCount:
         skippedMembers.length,
-
       failedCount:
         failedMembers.length,
-
       generatedBills,
       skippedMembers,
       failedMembers,
     };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
-/*
-  Generates one bill inside its own transaction.
-*/
-async function generateSingleMemberBill(
-  options
-) {
-  const connection =
-    await pool.getConnection();
-
-  try {
-    await connection.beginTransaction();
-
-    const result =
-      await generateMemberBill({
-        connection,
-        ...options,
-      });
-
-    await connection.commit();
-
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
   } finally {
     connection.release();
   }
 }
 
 module.exports = {
-  tableExists,
   getMember,
   getActiveMembers,
   getMemberCollections,
-  getPendingFeedDue,
-  getPendingAdvanceDue,
   getExistingBill,
-  generateMemberBill,
+  calculateMemberBill,
+  previewMemberBill,
   generateSingleMemberBill,
   generateAllMemberBills,
 };

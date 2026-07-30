@@ -1,855 +1,913 @@
 import {
   useEffect,
-  useMemo,
   useState,
 } from "react";
+
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorCard from "../components/ErrorCard";
-
 import MainLayout from "../layouts/MainLayout";
-import { formatAmount } from "../utils/amountUtils";
-
-import { getMembers } from "../services/memberService";
-
-import { getCollections } from "../services/collectionService";
 
 import {
-  generateBill,
+  getMembers,
+} from "../services/memberService";
+
+import {
   generateAllBills,
+  generateBill,
+  previewBill,
 } from "../services/billService";
 
+import {
+  formatAmount,
+} from "../utils/amountUtils";
+
 function MemberBill() {
-  const [members, setMembers] = useState([]);
-  const [collections, setCollections] = useState([]);
-  const [pageLoading, setPageLoading] = useState(true);
-const [pageError, setPageError] = useState("");
+  const [members, setMembers] =
+    useState([]);
+
+  const [pageLoading, setPageLoading] =
+    useState(true);
+
+  const [pageError, setPageError] =
+    useState("");
+
+  const [actionLoading, setActionLoading] =
+    useState(false);
 
   const [selectedMemberId, setSelectedMemberId] =
     useState("");
 
-  const [billMonth, setBillMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
+  const [billMonth, setBillMonth] =
+    useState(
+      new Date()
+        .toISOString()
+        .slice(0, 7)
+    );
 
   const [billCycle, setBillCycle] =
     useState("1");
 
+  const [reservePercent, setReservePercent] =
+    useState("10");
+
+  const [feedDue, setFeedDue] =
+    useState("0");
+
+  const [advanceDue, setAdvanceDue] =
+    useState("0");
+
+  const [otherDeduction, setOtherDeduction] =
+    useState("0");
+
+  const [billPreview, setBillPreview] =
+    useState(null);
+
   const [generatedBill, setGeneratedBill] =
     useState(null);
 
-  const [loading, setLoading] =
-    useState(false);
+  const [message, setMessage] =
+    useState("");
 
-  /*
-    Loads members from the backend.
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-    This function is placed before useEffect so
-    ESLint/React Compiler does not report:
-
-    Cannot access variable before it is declared.
-  */
-  async function loadMembers() {
+  async function loadInitialData() {
     try {
-      const result = await getMembers();
+      setPageLoading(true);
+      setPageError("");
 
-      if (result.success) {
-        setMembers(result.data || []);
-      } else {
-        alert(
+      const result =
+        await getMembers();
+
+      if (!result.success) {
+        throw new Error(
           result.message ||
             "Unable to load members"
         );
       }
-    } catch (error) {
-      console.error(
-        "Member loading error:",
-        error
-      );
 
-      alert(
-        error.message ||
-          "Unable to load members from backend"
-      );
-    }
-  }
-
-  /*
-    Loads collections from the backend.
-  */
-  async function loadCollections() {
-    try {
-      const result =
-        await getCollections();
-
-      if (result.success) {
-        setCollections(result.data || []);
-      } else {
-        alert(
-          result.message ||
-            "Unable to load collections"
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Collection loading error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to load collections from backend"
-      );
-    }
-  }
-
-  /*
-    Runs once when the Member Bill page opens.
-  */
- useEffect(() => {
-  loadInitialData();
-}, []);
-
-async function loadInitialData() {
-  try {
-    setPageLoading(true);
-    setPageError("");
-
-    const [
-      membersResult,
-      collectionsResult,
-    ] = await Promise.all([
-      getMembers(),
-      getCollections(),
-    ]);
-
-    if (membersResult.success) {
       setMembers(
-        membersResult.data || []
+        result.data || []
       );
-    }
-
-    if (collectionsResult.success) {
-      setCollections(
-        collectionsResult.data || []
+    } catch (error) {
+      console.error(
+        "Member Bill loading error:",
+        error
       );
-    }
-  } catch (error) {
-    console.error(
-      "Member Bill loading error:",
-      error
-    );
 
-    setPageError(
-      error.message ||
-        "Unable to load billing data"
-    );
-  } finally {
-    setPageLoading(false);
+      setPageError(
+        error.message ||
+          "Unable to load billing data"
+      );
+    } finally {
+      setPageLoading(false);
+    }
   }
-}
 
-  function getBillingDates(
-    month,
-    cycle
-  ) {
-    const [year, monthNumber] =
-      month.split("-");
+  function resetResult() {
+    setBillPreview(null);
+    setGeneratedBill(null);
+    setMessage("");
+  }
 
-    let fromDay = "01";
-    let toDay = "10";
-
-    if (cycle === "2") {
-      fromDay = "11";
-      toDay = "20";
-    }
-
-    if (cycle === "3") {
-      fromDay = "21";
-
-      const lastDay = new Date(
-        Number(year),
-        Number(monthNumber),
-        0
-      ).getDate();
-
-      toDay = String(lastDay).padStart(
-        2,
-        "0"
-      );
-    }
-
+  function createRequestData() {
     return {
-      fromDate:
-        `${year}-${monthNumber}-${fromDay}`,
+      memberId:
+        selectedMemberId,
 
-      toDate:
-        `${year}-${monthNumber}-${toDay}`,
+      billMonth,
+
+      billCycle:
+        Number(billCycle),
+
+      reservePercent:
+        Number(
+          reservePercent || 0
+        ),
+
+      feedDue:
+        Number(feedDue || 0),
+
+      advanceDue:
+        Number(
+          advanceDue || 0
+        ),
+
+      otherDeduction:
+        Number(
+          otherDeduction || 0
+        ),
+
+      generatedBy: "Admin",
     };
   }
 
-  const { fromDate, toDate } =
-    getBillingDates(
-      billMonth,
-      billCycle
-    );
-
-  const selectedMember =
-    members.find(
-      (member) =>
-        String(member.memberId) ===
-        String(selectedMemberId)
-    );
-
-  /*
-    Filters only the selected member's collections
-    from the selected billing period.
-  */
-  const previewCollections =
-    useMemo(() => {
-      return collections.filter(
-        (collection) =>
-          String(collection.memberId) ===
-            String(selectedMemberId) &&
-          collection.collectionDate >=
-            fromDate &&
-          collection.collectionDate <=
-            toDate
-      );
-    }, [
-      collections,
-      selectedMemberId,
-      fromDate,
-      toDate,
-    ]);
-
-  const cowMorningCollections =
-    previewCollections.filter(
-      (collection) =>
-        collection.milkType === "Cow" &&
-        collection.session === "Morning"
-    );
-
-  const cowEveningCollections =
-    previewCollections.filter(
-      (collection) =>
-        collection.milkType === "Cow" &&
-        collection.session === "Evening"
-    );
-
-  const buffaloMorningCollections =
-    previewCollections.filter(
-      (collection) =>
-        collection.milkType ===
-          "Buffalo" &&
-        collection.session === "Morning"
-    );
-
-  const buffaloEveningCollections =
-    previewCollections.filter(
-      (collection) =>
-        collection.milkType ===
-          "Buffalo" &&
-        collection.session === "Evening"
-    );
-
-  function getMilkTotal(
-    data,
-    milkType
-  ) {
-    return data
-      .filter(
-        (collection) =>
-          collection.milkType === milkType
-      )
-      .reduce(
-        (total, collection) =>
-          total +
-          Number(collection.quantity || 0),
-        0
-      );
-  }
-
-  function getAmountTotal(
-    data,
-    milkType
-  ) {
-    return data
-      .filter(
-        (collection) =>
-          collection.milkType === milkType
-      )
-      .reduce(
-        (total, collection) =>
-          total +
-          Number(collection.amount || 0),
-        0
-      );
-  }
-
-  const cowMilk = getMilkTotal(
-    previewCollections,
-    "Cow"
-  );
-
-  const buffaloMilk = getMilkTotal(
-    previewCollections,
-    "Buffalo"
-  );
-
-  const cowAmount = getAmountTotal(
-    previewCollections,
-    "Cow"
-  );
-
-  const buffaloAmount = getAmountTotal(
-    previewCollections,
-    "Buffalo"
-  );
-
-  const totalMilk = Number(
-    (cowMilk + buffaloMilk).toFixed(2)
-  );
-
-  const totalAmount = Number(
-    (cowAmount + buffaloAmount).toFixed(2)
-  );
-
-  async function handleGenerateBill() {
+  function validateForm() {
     if (!selectedMemberId) {
-      alert("Please select a member");
-      return;
+      setMessage(
+        "Please select a member"
+      );
+
+      return false;
+    }
+
+    if (!billMonth) {
+      setMessage(
+        "Please select billing month"
+      );
+
+      return false;
+    }
+
+    const numericValues = [
+      Number(reservePercent),
+      Number(feedDue),
+      Number(advanceDue),
+      Number(otherDeduction),
+    ];
+
+    if (
+      numericValues.some(
+        (value) =>
+          !Number.isFinite(value) ||
+          value < 0
+      )
+    ) {
+      setMessage(
+        "Deduction values cannot be negative"
+      );
+
+      return false;
     }
 
     if (
-      previewCollections.length === 0
+      Number(reservePercent) > 100
     ) {
-      alert(
-        "No milk collection found for this member and billing period"
+      setMessage(
+        "Reserve percentage cannot exceed 100"
       );
+
+      return false;
+    }
+
+    return true;
+  }
+
+  async function handlePreview() {
+    if (!validateForm()) {
       return;
     }
 
     try {
-      setLoading(true);
+      setActionLoading(true);
+      setMessage("");
+      setGeneratedBill(null);
 
-      const result = await generateBill({
-        memberId: selectedMemberId,
-        billMonth,
-        billCycle,
-      });
-
-      if (!result.success) {
-        alert(
-          result.message ||
-            "Bill generation failed"
+      const result =
+        await previewBill(
+          createRequestData()
         );
-        return;
-      }
 
-      setGeneratedBill(result.data);
+      setBillPreview(
+        result.data
+      );
 
-      alert(result.message);
+      setMessage(
+        result.data.existing
+          ? "Existing bill loaded as a fresh preview. Saving will update it."
+          : "Bill preview calculated successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Bill preview error:",
+        error
+      );
+
+      setBillPreview(null);
+
+      setMessage(
+        error.message ||
+          "Unable to calculate bill preview"
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleGenerateBill() {
+    if (!validateForm()) {
+      return;
+    }
+
+    if (!billPreview) {
+      setMessage(
+        "Calculate the preview before saving the bill"
+      );
+
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        billPreview.existing
+          ? "Update this existing bill using the displayed calculation?"
+          : "Generate and save this bill?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setMessage("");
+
+      const result =
+        await generateBill(
+          createRequestData()
+        );
+
+      setGeneratedBill(
+        result.data
+      );
+
+      setBillPreview(
+        result.data
+      );
+
+      setMessage(
+        result.message
+      );
     } catch (error) {
       console.error(
         "Generate bill error:",
         error
       );
 
-      alert(
+      setMessage(
         error.message ||
           "Unable to generate bill"
       );
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   }
 
   async function handleGenerateAllBills() {
-    const confirmGeneration =
+    const confirmed =
       window.confirm(
-        "Generate or update all bills for this billing cycle?"
+        "Generate or update bills for all active members? Feed and advance deductions are kept at zero for bulk generation."
       );
 
-    if (!confirmGeneration) {
+    if (!confirmed) {
       return;
     }
 
     try {
-      setLoading(true);
+      setActionLoading(true);
+      setMessage("");
 
       const result =
         await generateAllBills({
           billMonth,
-          billCycle,
+          billCycle:
+            Number(billCycle),
+          reservePercent:
+            Number(
+              reservePercent || 0
+            ),
+          otherDeduction:
+            Number(
+              otherDeduction || 0
+            ),
+          generatedBy: "Admin",
         });
 
-      if (!result.success) {
-        alert(
-          result.message ||
-            "All bill generation failed"
-        );
-        return;
-      }
-
-      alert(result.message);
+      setMessage(
+        `${result.data.generatedCount} generated, ${result.data.skippedCount} skipped and ${result.data.failedCount} failed.`
+      );
     } catch (error) {
       console.error(
         "Generate all bills error:",
         error
       );
 
-      alert(
+      setMessage(
         error.message ||
           "Unable to generate all bills"
       );
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   }
 
-  function renderTable(data) {
+  function renderCollectionTable(
+    collections
+  ) {
     return (
-      <table className="bill-mini-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Lit</th>
-            <th>Fat</th>
-            <th>SNF</th>
-            <th>Rate</th>
-            <th>Amt</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {data.length === 0 ? (
+      <div className="bill-table-scroll">
+        <table className="bill-items-table">
+          <thead>
             <tr>
-              <td colSpan="6">
-                No Data
-              </td>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Session</th>
+              <th>Type</th>
+              <th>Litres</th>
+              <th>FAT</th>
+              <th>SNF</th>
+              <th>Rate</th>
+              <th>Amount</th>
             </tr>
-          ) : (
-            data.map((collection) => (
-              <tr
-                key={
-                  collection.collectionId
-                }
-              >
-                <td>
-                  {
-                    collection.collectionDate
+          </thead>
+
+          <tbody>
+            {collections.map(
+              (collection) => (
+                <tr
+                  key={
+                    collection.collectionId
                   }
-                </td>
+                >
+                  <td>
+                    {
+                      collection.collectionDate
+                    }
+                  </td>
 
-                <td>
-                  {collection.quantity}
-                </td>
+                  <td>
+                    {
+                      collection.collectionTime
+                    }
+                  </td>
 
-                <td>{collection.fat}</td>
+                  <td>
+                    {
+                      collection.session
+                    }
+                  </td>
 
-                <td>{collection.snf}</td>
+                  <td>
+                    {
+                      collection.milkType
+                    }
+                  </td>
 
-                <td>
-                  ₹
-                  {formatAmount(
-                    collection.rate
-                  )}
-                </td>
+                  <td>
+                    {
+                      collection.quantity
+                    }
+                  </td>
 
-                <td>
-                  ₹
-                  {formatAmount(
-                    collection.amount
-                  )}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+                  <td>
+                    {collection.fat}
+                  </td>
+
+                  <td>
+                    {collection.snf}
+                  </td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      collection.rate
+                    )}
+                  </td>
+
+                  <td>
+                    ₹
+                    {formatAmount(
+                      collection.amount
+                    )}
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
   return (
-  <MainLayout>
-    {pageLoading ? (
-      <LoadingSpinner
-        message="Loading billing information..."
-      />
-    ) : pageError ? (
-      <ErrorCard
-        title="Billing data could not be loaded"
-        message={pageError}
-        onRetry={loadInitialData}
-      />
-    ) : (
-      <>
-        <h1>Member Bill Report</h1>
+    <MainLayout>
+      {pageLoading ? (
+        <LoadingSpinner
+          message="Loading billing information..."
+        />
+      ) : pageError ? (
+        <ErrorCard
+          title="Billing data could not be loaded"
+          message={pageError}
+          onRetry={loadInitialData}
+        />
+      ) : (
+        <div className="member-bill-page">
+          <div className="member-bill-heading">
+            <div>
+              <span>
+                Bill Migration Part 2
+              </span>
 
-        <div className="collection-form">
-          <select
-            value={selectedMemberId}
-            onChange={(event) => {
-              setSelectedMemberId(
-                event.target.value
-              );
+              <h1>Member Bill</h1>
 
-              setGeneratedBill(null);
-            }}
-          >
-            <option value="">
-              Select Member
-            </option>
+              <p>
+                Preview and save MySQL-backed
+                milk bills with feed, advance,
+                reserve and other deductions.
+              </p>
+            </div>
 
-            {members.map((member) => (
-              <option
-                key={member.memberId}
-                value={member.memberId}
+            <button
+              type="button"
+              className="bill-secondary-button"
+              disabled={actionLoading}
+              onClick={
+                handleGenerateAllBills
+              }
+            >
+              Generate All Bills
+            </button>
+          </div>
+
+          {message && (
+            <div className="bill-page-message">
+              {message}
+            </div>
+          )}
+
+          <section className="bill-control-card">
+            <div>
+              <label>Member</label>
+
+              <select
+                value={
+                  selectedMemberId
+                }
+                onChange={(event) => {
+                  setSelectedMemberId(
+                    event.target.value
+                  );
+
+                  resetResult();
+                }}
               >
-                {member.memberId} -{" "}
-                {member.name}
-              </option>
-            ))}
-          </select>
+                <option value="">
+                  Select member
+                </option>
 
-          <input
-            type="month"
-            value={billMonth}
-            onChange={(event) => {
-              setBillMonth(
-                event.target.value
-              );
-
-              setGeneratedBill(null);
-            }}
-          />
-
-          <select
-            value={billCycle}
-            onChange={(event) => {
-              setBillCycle(
-                event.target.value
-              );
-
-              setGeneratedBill(null);
-            }}
-          >
-            <option value="1">
-              Cycle 1: 1 - 10
-            </option>
-
-            <option value="2">
-              Cycle 2: 11 - 20
-            </option>
-
-            <option value="3">
-              Cycle 3: 21 - End Month
-            </option>
-          </select>
-        </div>
-
-        <p>
-          <strong>Billing Period:</strong>{" "}
-          {fromDate} to {toDate}
-        </p>
-
-        <div
-          style={{
-            marginBottom: "20px",
-          }}
-        >
-          <button
-            type="button"
-            className="generate-bill-btn"
-            onClick={handleGenerateAllBills}
-            disabled={loading}
-          >
-            {loading
-              ? "Processing..."
-              : "Generate / Update All Bills"}
-          </button>
-        </div>
-
-        {selectedMemberId && (
-          <div className="bill-box">
-            <div className="bill-header">
-              <h2>Milk Bill Preview</h2>
-
-              <p>
-                <strong>Member:</strong>{" "}
-                {selectedMember?.memberId} -{" "}
-                {selectedMember?.name}
-              </p>
-
-              <p>
-                <strong>Period:</strong>{" "}
-                {fromDate} to {toDate}
-              </p>
+                {members.map(
+                  (member) => (
+                    <option
+                      key={
+                        member.memberId
+                      }
+                      value={
+                        member.memberId
+                      }
+                    >
+                      {member.memberId} -{" "}
+                      {member.name}
+                    </option>
+                  )
+                )}
+              </select>
             </div>
 
-            <div className="bill-parallel-layout">
-              <div className="bill-animal-section">
-                <h2>🐄 Cow Milk</h2>
+            <div>
+              <label>Bill Month</label>
 
-                <div className="bill-session-container">
-                  <div className="bill-session-box">
-                    <h3>Morning</h3>
+              <input
+                type="month"
+                value={billMonth}
+                onChange={(event) => {
+                  setBillMonth(
+                    event.target.value
+                  );
 
-                    {renderTable(
-                      cowMorningCollections
-                    )}
-                  </div>
-
-                  <div className="bill-session-box">
-                    <h3>Evening</h3>
-
-                    {renderTable(
-                      cowEveningCollections
-                    )}
-                  </div>
-                </div>
-
-                <div className="animal-total">
-                  <p>
-                    <strong>Cow Milk:</strong>{" "}
-                    {formatAmount(cowMilk)} L
-                  </p>
-
-                  <p>
-                    <strong>Cow Amount:</strong>{" "}
-                    ₹{formatAmount(cowAmount)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bill-animal-section">
-                <h2>🐃 Buffalo Milk</h2>
-
-                <div className="bill-session-container">
-                  <div className="bill-session-box">
-                    <h3>Morning</h3>
-
-                    {renderTable(
-                      buffaloMorningCollections
-                    )}
-                  </div>
-
-                  <div className="bill-session-box">
-                    <h3>Evening</h3>
-
-                    {renderTable(
-                      buffaloEveningCollections
-                    )}
-                  </div>
-                </div>
-
-                <div className="animal-total">
-                  <p>
-                    <strong>
-                      Buffalo Milk:
-                    </strong>{" "}
-                    {formatAmount(
-                      buffaloMilk
-                    )}{" "}
-                    L
-                  </p>
-
-                  <p>
-                    <strong>
-                      Buffalo Amount:
-                    </strong>{" "}
-                    ₹
-                    {formatAmount(
-                      buffaloAmount
-                    )}
-                  </p>
-                </div>
-              </div>
+                  resetResult();
+                }}
+              />
             </div>
 
-            <div className="bill-final-summary">
-              <h2>Preview Summary</h2>
+            <div>
+              <label>Bill Cycle</label>
 
-              <table className="bill-summary-table">
-                <tbody>
-                  <tr>
-                    <td>Total Milk</td>
+              <select
+                value={billCycle}
+                onChange={(event) => {
+                  setBillCycle(
+                    event.target.value
+                  );
 
-                    <td>
-                      {formatAmount(
-                        totalMilk
-                      )}{" "}
+                  resetResult();
+                }}
+              >
+                <option value="1">
+                  Cycle 1: 1–10
+                </option>
+
+                <option value="2">
+                  Cycle 2: 11–20
+                </option>
+
+                <option value="3">
+                  Cycle 3: 21–Month End
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label>
+                Feed Due (₹)
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={feedDue}
+                onChange={(event) => {
+                  setFeedDue(
+                    event.target.value
+                  );
+
+                  resetResult();
+                }}
+              />
+            </div>
+
+            <div>
+              <label>
+                Advance Due (₹)
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={advanceDue}
+                onChange={(event) => {
+                  setAdvanceDue(
+                    event.target.value
+                  );
+
+                  resetResult();
+                }}
+              />
+            </div>
+
+            <div>
+              <label>
+                Other Deduction (₹)
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={
+                  otherDeduction
+                }
+                onChange={(event) => {
+                  setOtherDeduction(
+                    event.target.value
+                  );
+
+                  resetResult();
+                }}
+              />
+            </div>
+
+            <div>
+              <label>
+                Reserve (%)
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={
+                  reservePercent
+                }
+                onChange={(event) => {
+                  setReservePercent(
+                    event.target.value
+                  );
+
+                  resetResult();
+                }}
+              />
+            </div>
+
+            <button
+              type="button"
+              className="bill-primary-button"
+              disabled={actionLoading}
+              onClick={handlePreview}
+            >
+              {actionLoading
+                ? "Please wait..."
+                : "Calculate Preview"}
+            </button>
+          </section>
+
+          {billPreview && (
+            <>
+              <section className="bill-preview-document">
+                <div className="bill-preview-header">
+                  <div>
+                    <span>
+                      Dairy Management System
+                    </span>
+
+                    <h2>
+                      Milk Collection Bill
+                    </h2>
+                  </div>
+
+                  <div>
+                    <small>
+                      Bill Period
+                    </small>
+
+                    <strong>
+                      {
+                        billPreview.periodFrom
+                      }{" "}
+                      to{" "}
+                      {
+                        billPreview.periodTo
+                      }
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="bill-member-summary">
+                  <div>
+                    <span>Member ID</span>
+                    <strong>
+                      {
+                        billPreview.memberId
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Member</span>
+                    <strong>
+                      {
+                        billPreview.memberName
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Village</span>
+                    <strong>
+                      {billPreview.village ||
+                        "-"}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Collections
+                    </span>
+                    <strong>
+                      {
+                        billPreview.collectionCount
+                      }
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="bill-total-grid">
+                  <div>
+                    <span>Cow Milk</span>
+                    <strong>
+                      {
+                        billPreview.cowMilk
+                      }{" "}
                       L
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td>Milk Amount</td>
-
-                    <td>
+                    </strong>
+                    <small>
                       ₹
                       {formatAmount(
-                        totalAmount
+                        billPreview.cowAmount
                       )}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    </small>
+                  </div>
 
-              <button
-                type="button"
-                className="generate-bill-btn"
-                onClick={handleGenerateBill}
-                disabled={loading}
-              >
-                {loading
-                  ? "Generating..."
-                  : "Generate / Update This Bill"}
-              </button>
-            </div>
-          </div>
-        )}
+                  <div>
+                    <span>
+                      Buffalo Milk
+                    </span>
+                    <strong>
+                      {
+                        billPreview.buffaloMilk
+                      }{" "}
+                      L
+                    </strong>
+                    <small>
+                      ₹
+                      {formatAmount(
+                        billPreview.buffaloAmount
+                      )}
+                    </small>
+                  </div>
 
-        {generatedBill && (
-          <div className="bill-final-summary">
-            <h2>
-              Generated Bill Summary
-            </h2>
+                  <div>
+                    <span>Total Milk</span>
+                    <strong>
+                      {
+                        billPreview.totalMilk
+                      }{" "}
+                      L
+                    </strong>
+                    <small>
+                      Avg FAT{" "}
+                      {
+                        billPreview.averageFat
+                      }{" "}
+                      / SNF{" "}
+                      {
+                        billPreview.averageSnf
+                      }
+                    </small>
+                  </div>
 
-            <table className="bill-summary-table">
-              <tbody>
-                <tr>
-                  <td>Member</td>
+                  <div className="bill-highlight-card">
+                    <span>
+                      Milk Amount
+                    </span>
+                    <strong>
+                      ₹
+                      {formatAmount(
+                        billPreview.milkAmount
+                      )}
+                    </strong>
+                  </div>
+                </div>
 
-                  <td>
-                    {generatedBill.memberId} -{" "}
-                    {generatedBill.memberName}
-                  </td>
-                </tr>
+                <div className="bill-calculation-grid">
+                  <div>
+                    <span>
+                      Feed Deducted
+                    </span>
+                    <strong>
+                      - ₹
+                      {formatAmount(
+                        billPreview.feedDeducted
+                      )}
+                    </strong>
+                  </div>
 
-                <tr>
-                  <td>Total Milk</td>
+                  <div>
+                    <span>
+                      Advance Deducted
+                    </span>
+                    <strong>
+                      - ₹
+                      {formatAmount(
+                        billPreview.advanceDeducted
+                      )}
+                    </strong>
+                  </div>
 
-                  <td>
-                    {formatAmount(
-                      generatedBill.totalMilk
-                    )}{" "}
-                    L
-                  </td>
-                </tr>
+                  <div>
+                    <span>
+                      Other Deduction
+                    </span>
+                    <strong>
+                      - ₹
+                      {formatAmount(
+                        billPreview.otherDeduction
+                      )}
+                    </strong>
+                  </div>
 
-                <tr>
-                  <td>Milk Amount</td>
+                  <div>
+                    <span>
+                      Reserve
+                    </span>
+                    <strong>
+                      - ₹
+                      {formatAmount(
+                        billPreview.reserveAmount
+                      )}
+                    </strong>
+                  </div>
 
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.milkAmount
-                    )}
-                  </td>
-                </tr>
+                  <div>
+                    <span>
+                      Total Deduction
+                    </span>
+                    <strong>
+                      ₹
+                      {formatAmount(
+                        billPreview.totalDeduction
+                      )}
+                    </strong>
+                  </div>
 
-                <tr>
-                  <td>
-                    Reserve Amount 10%
-                  </td>
+                  <div className="bill-net-card">
+                    <span>
+                      Net Payable
+                    </span>
+                    <strong>
+                      ₹
+                      {formatAmount(
+                        billPreview.netPayable
+                      )}
+                    </strong>
+                  </div>
+                </div>
 
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.reserveAmount
-                    )}
-                  </td>
-                </tr>
+                <h3>
+                  Collection Items
+                </h3>
 
-                <tr>
-                  <td>Feed Due</td>
+                {renderCollectionTable(
+                  billPreview.collections
+                )}
+              </section>
 
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.feedDue
-                    )}
-                  </td>
-                </tr>
+              <div className="bill-save-actions">
+                <button
+                  type="button"
+                  className="bill-primary-button"
+                  disabled={actionLoading}
+                  onClick={
+                    handleGenerateBill
+                  }
+                >
+                  {generatedBill
+                    ? "Update Saved Bill"
+                    : billPreview.existing
+                      ? "Update Existing Bill"
+                      : "Generate and Save Bill"}
+                </button>
 
-                <tr>
-                  <td>Feed Deducted</td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.feedDeducted
-                    )}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td>Advance Due</td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.advanceDue
-                    )}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td>
-                    Advance Deducted
-                  </td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.advanceDeducted
-                    )}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td>
-                    Total Deduction
-                  </td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.totalDeduction
-                    )}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td>Remaining Due</td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.remainingDue
-                    )}
-                  </td>
-                </tr>
-
-                <tr className="net-payable-row">
-                  <td>Net Payable</td>
-
-                  <td>
-                    ₹
-                    {formatAmount(
-                      generatedBill.netPayable
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </>
-    )}
-  </MainLayout>
-);
+                <button
+                  type="button"
+                  className="bill-secondary-button"
+                  onClick={() =>
+                    window.print()
+                  }
+                >
+                  Print Preview
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </MainLayout>
+  );
 }
 
 export default MemberBill;
