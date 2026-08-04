@@ -1,275 +1,278 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
-import { formatAmount } from "../utils/amountUtils";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorCard from "../components/ErrorCard";
+import {
+  cancelBill,
+  getBillHistory,
+} from "../services/billHistoryService";
+import { formatAmount } from "../utils/amountUtils";
 
 function BillHistory() {
-  const [billRecords, setBillRecords] = useState([]);
-  const [members, setMembers] = useState([]);
-
-  const [reportType, setReportType] = useState("all");
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [loading, setLoading] = useState(false);
-const [error, setError] = useState("");
-
-  const [billMonth, setBillMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
-
-  const [billCycle, setBillCycle] = useState("1");
-
-  useEffect(() => {
-    const savedBills = localStorage.getItem("billRecords");
-    const savedMembers = localStorage.getItem("members");
-
-    if (savedBills) {
-      setBillRecords(JSON.parse(savedBills));
-    }
-
-    if (savedMembers) {
-      setMembers(JSON.parse(savedMembers));
-    }
-  }, []);
-
-  const filteredBills = billRecords.filter((bill) => {
-    const monthMatch = bill.billMonth === billMonth;
-
-    const cycleMatch = bill.billCycle === billCycle;
-
-    const memberMatch =
-      reportType === "all" ||
-      bill.memberId === selectedMemberId;
-
-    return monthMatch && cycleMatch && memberMatch;
+  const [bills, setBills] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [filters, setFilters] = useState({
+    search: "",
+    billMonth: "",
+    billCycle: "",
+    status: "",
   });
 
-  const totalBills = filteredBills.length;
+  useEffect(() => {
+    loadBills();
+  }, []);
 
-  const totalMilk = filteredBills.reduce(
-    (total, bill) =>
-      total + Number(bill.totalMilk || 0),
-    0
+  async function loadBills() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const result = await getBillHistory();
+      setBills(result.data || []);
+    } catch (error) {
+      console.error("Bill history error:", error);
+      setError(error.message || "Unable to load bill history");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filteredBills = useMemo(() => {
+    const searchText = filters.search.trim().toLowerCase();
+
+    return bills.filter((bill) => {
+      const matchesSearch =
+        !searchText ||
+        bill.billNumber?.toLowerCase().includes(searchText) ||
+        bill.memberName?.toLowerCase().includes(searchText) ||
+        bill.memberId?.toLowerCase().includes(searchText);
+
+      const matchesMonth =
+        !filters.billMonth || bill.billMonth === filters.billMonth;
+
+      const matchesCycle =
+        !filters.billCycle ||
+        String(bill.billCycle) === String(filters.billCycle);
+
+      const matchesStatus =
+        !filters.status || bill.status === filters.status;
+
+      return (
+        matchesSearch &&
+        matchesMonth &&
+        matchesCycle &&
+        matchesStatus
+      );
+    });
+  }, [bills, filters]);
+
+  const summary = useMemo(
+    () => ({
+      totalBills: filteredBills.length,
+      totalPayable: filteredBills.reduce(
+        (total, bill) => total + Number(bill.netPayable || 0),
+        0
+      ),
+      totalPaid: filteredBills.reduce(
+        (total, bill) => total + Number(bill.paidAmount || 0),
+        0
+      ),
+      totalBalance: filteredBills.reduce(
+        (total, bill) => total + Number(bill.balanceAmount || 0),
+        0
+      ),
+    }),
+    [filteredBills]
   );
 
-  const totalMilkAmount = filteredBills.reduce(
-    (total, bill) =>
-      total + Number(bill.milkAmount || 0),
-    0
-  );
+  async function handleCancelBill(bill) {
+    const confirmed = window.confirm(
+      `Cancel bill ${bill.billNumber}?`
+    );
 
-  const totalReserve = filteredBills.reduce(
-    (total, bill) =>
-      total + Number(bill.reserveAmount || 0),
-    0
-  );
+    if (!confirmed) {
+      return;
+    }
 
-  const totalFeed = filteredBills.reduce(
-    (total, bill) =>
-      total + Number(bill.feedDeducted || 0),
-    0
-  );
-
-  const totalAdvance = filteredBills.reduce(
-    (total, bill) =>
-      total + Number(bill.advanceDeducted || 0),
-    0
-  );
-
-  const totalNetPayable = filteredBills.reduce(
-    (total, bill) =>
-      total + Number(bill.netPayable || 0),
-    0
-  );
+    try {
+      const result = await cancelBill(bill.billId);
+      setMessage(result.message);
+      await loadBills();
+    } catch (error) {
+      setMessage(error.message || "Unable to cancel bill");
+    }
+  }
 
   return (
     <MainLayout>
-      <h1>Bill History Report</h1>
+      <div className="bill-history-page">
+        <div className="bill-history-header">
+          <div>
+            <span>Billing Records</span>
+            <h1>Bill History</h1>
+            <p>Review generated bills, payment status and balances.</p>
+          </div>
+          <button type="button" onClick={() => window.print()}>
+            Print
+          </button>
+        </div>
 
-      <div className="collection-form">
-        <select
-          value={reportType}
-          onChange={(e) => {
-            setReportType(e.target.value);
-            setSelectedMemberId("");
-          }}
-        >
-          <option value="all">All Members</option>
-          <option value="single">Single Member</option>
-        </select>
-
-        {reportType === "single" && (
-          <select
-            value={selectedMemberId}
-            onChange={(e) =>
-              setSelectedMemberId(e.target.value)
-            }
-          >
-            <option value="">Select Member</option>
-
-            {members.map((member) => (
-              <option
-                key={member.memberId}
-                value={member.memberId}
-              >
-                {member.memberId} - {member.name}
-              </option>
-            ))}
-          </select>
+        {message && (
+          <div className="bill-history-message">{message}</div>
         )}
 
-        <input
-          type="month"
-          value={billMonth}
-          onChange={(e) =>
-            setBillMonth(e.target.value)
-          }
-        />
-
-        <select
-          value={billCycle}
-          onChange={(e) =>
-            setBillCycle(e.target.value)
-          }
-        >
-          <option value="1">Cycle 1: 1 - 10</option>
-          <option value="2">Cycle 2: 11 - 20</option>
-          <option value="3">Cycle 3: 21 - End Month</option>
-        </select>
-      </div>
-
-      <div className="session-summary-grid">
-        <div className="session-summary-card">
-          <h3>Total Bills</h3>
-          <h2>{totalBills}</h2>
-          <p>Generated bills</p>
+        <div className="bill-history-summary">
+          <div>
+            <span>Total Bills</span>
+            <strong>{summary.totalBills}</strong>
+          </div>
+          <div>
+            <span>Net Payable</span>
+            <strong>₹{formatAmount(summary.totalPayable)}</strong>
+          </div>
+          <div>
+            <span>Paid Amount</span>
+            <strong>₹{formatAmount(summary.totalPaid)}</strong>
+          </div>
+          <div>
+            <span>Pending Balance</span>
+            <strong>₹{formatAmount(summary.totalBalance)}</strong>
+          </div>
         </div>
 
-        <div className="session-summary-card">
-          <h3>Total Milk</h3>
-          <h2>{formatAmount(totalMilk)} L</h2>
-          <p>Cycle milk</p>
-        </div>
+        <section className="bill-history-card">
+          <div className="bill-history-filters">
+            <input
+              placeholder="Search bill or member..."
+              value={filters.search}
+              onChange={(event) =>
+                setFilters((previous) => ({
+                  ...previous,
+                  search: event.target.value,
+                }))
+              }
+            />
 
-        <div className="session-summary-card">
-          <h3>Milk Amount</h3>
-          <h2>₹{formatAmount(totalMilkAmount)}</h2>
-          <p>Total milk amount</p>
-        </div>
+            <input
+              type="month"
+              value={filters.billMonth}
+              onChange={(event) =>
+                setFilters((previous) => ({
+                  ...previous,
+                  billMonth: event.target.value,
+                }))
+              }
+            />
 
-        <div className="session-summary-card">
-          <h3>Net Payable</h3>
-          <h2>₹{formatAmount(totalNetPayable)}</h2>
-          <p>Final payable</p>
-        </div>
-      </div>
+            <select
+              value={filters.billCycle}
+              onChange={(event) =>
+                setFilters((previous) => ({
+                  ...previous,
+                  billCycle: event.target.value,
+                }))
+              }
+            >
+              <option value="">All Cycles</option>
+              <option value="1">Cycle 1</option>
+              <option value="2">Cycle 2</option>
+              <option value="3">Cycle 3</option>
+            </select>
 
-      <table className="member-table">
-        <thead>
-          <tr>
-            <th>Bill ID</th>
-            <th>Member ID</th>
-            <th>Member Name</th>
-            <th>Month</th>
-            <th>Cycle</th>
-            <th>Total Milk</th>
-            <th>Milk Amount</th>
-            <th>Reserve</th>
-            <th>Feed</th>
-            <th>Advance</th>
-            <th>Remaining Due</th>
-            <th>Net Payable</th>
-            <th>Generated Date</th>
-          </tr>
-        </thead>
+            <select
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((previous) => ({
+                  ...previous,
+                  status: event.target.value,
+                }))
+              }
+            >
+              <option value="">All Statuses</option>
+              <option>Pending</option>
+              <option>Partially Paid</option>
+              <option>Paid</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
 
-        <tbody>
-          {filteredBills.length === 0 ? (
-            <tr>
-              <td colSpan="13">
-                No bill records found.
-              </td>
-            </tr>
+          {loading ? (
+            <LoadingSpinner message="Loading bill history..." />
+          ) : error ? (
+            <ErrorCard
+              title="Bill history could not be loaded"
+              message={error}
+              onRetry={loadBills}
+            />
           ) : (
-            filteredBills.map((bill) => (
-              <tr key={bill.billId}>
-                <td>{bill.billId}</td>
-                <td>{bill.memberId}</td>
-                <td>{bill.memberName}</td>
-                <td>{bill.billMonth}</td>
-                <td>{bill.billCycle}</td>
-                <td>{formatAmount(bill.totalMilk)} L</td>
-                <td>₹{formatAmount(bill.milkAmount)}</td>
-                <td>₹{formatAmount(bill.reserveAmount)}</td>
-                <td>₹{formatAmount(bill.feedDeducted)}</td>
-                <td>₹{formatAmount(bill.advanceDeducted)}</td>
-                <td>₹{formatAmount(bill.remainingDue)}</td>
-                <td>₹{formatAmount(bill.netPayable)}</td>
-                <td>{bill.generatedDate}</td>
-              </tr>
-            ))
+            <div className="bill-history-table-scroll">
+              <table className="bill-history-table">
+                <thead>
+                  <tr>
+                    <th>Bill No.</th>
+                    <th>Member</th>
+                    <th>Period</th>
+                    <th>Milk</th>
+                    <th>Net Payable</th>
+                    <th>Paid</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Payments</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBills.length === 0 ? (
+                    <tr>
+                      <td colSpan="10">No bill history found</td>
+                    </tr>
+                  ) : (
+                    filteredBills.map((bill) => (
+                      <tr key={bill.billId}>
+                        <td>{bill.billNumber}</td>
+                        <td>
+                          {bill.memberId} - {bill.memberName}
+                        </td>
+                        <td>
+                          {bill.periodFrom} to {bill.periodTo}
+                        </td>
+                        <td>{bill.totalMilk} L</td>
+                        <td>₹{formatAmount(bill.netPayable)}</td>
+                        <td>₹{formatAmount(bill.paidAmount)}</td>
+                        <td>₹{formatAmount(bill.balanceAmount)}</td>
+                        <td>
+                          <span
+                            className={`bill-history-status ${String(
+                              bill.status
+                            )
+                              .toLowerCase()
+                              .replace(" ", "-")}`}
+                          >
+                            {bill.status}
+                          </span>
+                        </td>
+                        <td>{bill.paymentCount}</td>
+                        <td>
+                          {bill.status !== "Cancelled" &&
+                            Number(bill.paidAmount) === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelBill(bill)}
+                              >
+                                Cancel
+                              </button>
+                            )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
-        </tbody>
-      </table>
-
-      <div className="payment-summary-section">
-        <h2>Bill History Summary</h2>
-
-        <table className="payment-summary-table">
-          <tbody>
-            <tr>
-              <td>
-                <strong>Total Bills</strong>
-                <br />
-                {totalBills}
-              </td>
-
-              <td>
-                <strong>Total Milk</strong>
-                <br />
-                {formatAmount(totalMilk)} L
-              </td>
-
-              <td>
-                <strong>Milk Amount</strong>
-                <br />
-                ₹{formatAmount(totalMilkAmount)}
-              </td>
-
-              <td>
-                <strong>Reserve</strong>
-                <br />
-                ₹{formatAmount(totalReserve)}
-              </td>
-            </tr>
-
-            <tr>
-              <td>
-                <strong>Feed</strong>
-                <br />
-                ₹{formatAmount(totalFeed)}
-              </td>
-
-              <td>
-                <strong>Advance</strong>
-                <br />
-                ₹{formatAmount(totalAdvance)}
-              </td>
-
-              <td>
-                <strong>Net Payable</strong>
-                <br />
-                ₹{formatAmount(totalNetPayable)}
-              </td>
-
-              <td>
-                <strong>Cycle</strong>
-                <br />
-                {billCycle}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        </section>
       </div>
     </MainLayout>
   );

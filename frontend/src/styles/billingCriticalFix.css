@@ -1,0 +1,100 @@
+.print-all-header {
+  display:flex;
+  justify-content:space-between;
+  gap:20px;
+  align-items:flex-start;
+  margin-bottom:20px;
+}
+
+.print-all-header span {
+  color:#2563eb;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+
+.print-all-header h1 {
+  margin:7px 0 0;
+}
+
+.print-all-header p {
+  margin:7px 0 0;
+  color:#64748b;
+}
+
+.print-all-header button,
+.print-filter button {
+  min-height:42px;
+  padding:0 15px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.print-filter {
+  display:grid;
+  grid-template-columns:220px 240px auto;
+  gap:12px;
+  align-items:end;
+  margin-bottom:18px;
+  padding:16px;
+  border:1px solid #dbe4ef;
+  border-radius:16px;
+  background:#fff;
+}
+
+.print-filter input,
+.print-filter select {
+  width:100%;
+  min-height:42px;
+  padding:0 11px;
+  border:1px solid #cbd5e1;
+  border-radius:9px;
+}
+
+.print-message {
+  margin-bottom:15px;
+  padding:12px 14px;
+  border:1px solid #bfdbfe;
+  border-radius:11px;
+  background:#eff6ff;
+  color:#1d4ed8;
+  font-weight:700;
+}
+
+.print-empty-state {
+  padding:60px 20px;
+  border:1px dashed #cbd5e1;
+  border-radius:17px;
+  background:#fff;
+  text-align:center;
+  color:#64748b;
+}
+
+.print-bill-list {
+  display:grid;
+  gap:10px;
+}
+
+.print-bill-card {
+  display:grid;
+  grid-template-columns:1.2fr 1fr auto;
+  gap:15px;
+  padding:14px;
+  border:1px solid #dbe4ef;
+  border-radius:12px;
+  background:#fff;
+}
+
+@media (max-width:700px) {
+  .print-all-header {
+    flex-direction:column;
+  }
+
+  .print-filter {
+    grid-template-columns:1fr;
+  }
+}

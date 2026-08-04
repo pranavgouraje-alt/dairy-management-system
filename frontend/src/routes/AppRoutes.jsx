@@ -29,6 +29,8 @@ import FeedManagement from "../pages/FeedManagement";
 import Analytics from "../pages/Analytics";
 import BackupRestore from "../pages/BackupRestore";
 import ActivityLogs from "../pages/ActivityLogs";
+//import PaymentRegister from "../pages/PaymentRegister";
+//import BillHistory from "../pages/BillHistory";
 
 function PrivatePage({
   children,

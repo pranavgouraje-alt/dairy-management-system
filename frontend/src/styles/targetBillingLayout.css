@@ -1,0 +1,596 @@
+/* ============================================================
+   TARGET PAYMENT REGISTER + MEMBER BILL
+============================================================ */
+
+.target-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.target-page-label {
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.target-page-header h1 {
+  margin: 7px 0 0;
+  color: #0f172a;
+  font-size: 34px;
+}
+
+.target-page-header p {
+  margin: 7px 0 0;
+  color: #64748b;
+}
+
+.target-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.target-header-actions button,
+.target-bill-actions button,
+.target-modal-actions button {
+  min-height: 44px;
+  padding: 0 17px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.primary-action {
+  border: none !important;
+  background:
+    linear-gradient(
+      135deg,
+      #2563eb,
+      #0284c7
+    ) !important;
+  color: #ffffff !important;
+}
+
+.target-message {
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.target-filter-card {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1fr)
+    minmax(200px, 1fr)
+    minmax(260px, 1fr)
+    minmax(180px, 0.7fr);
+  gap: 13px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #dbe4ef;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow:
+    0 8px 24px
+    rgba(15, 23, 42, 0.055);
+}
+
+.target-filter-card label {
+  display: block;
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.target-filter-card input,
+.target-filter-card select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.target-period-box,
+.target-record-count {
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 13px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.target-period-box span,
+.target-record-count span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.target-period-box strong,
+.target-record-count strong {
+  margin-top: 4px;
+  color: #1d4ed8;
+}
+
+.target-register-card {
+  overflow: hidden;
+  border: 1px solid #64748b;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.target-table-scroll {
+  overflow-x: auto;
+}
+
+.target-payment-table {
+  width: 100%;
+  min-width: 1450px;
+  border-collapse: collapse;
+}
+
+.target-payment-table th,
+.target-payment-table td {
+  padding: 9px 7px;
+  border: 1px solid #475569;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.target-payment-table thead th {
+  background: #0ea5e9;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.target-payment-table thead small {
+  display: block;
+  margin-top: 3px;
+  font-size: 7px;
+  opacity: 0.9;
+}
+
+.target-payment-table tfoot th {
+  background: #bae6fd;
+  color: #0f172a;
+}
+
+.target-payment-table .member-name-cell {
+  text-align: left;
+  font-weight: 700;
+}
+
+.table-pay-button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.paid-status {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.target-register-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.summary-block {
+  min-height: 145px;
+  padding: 14px;
+  border: 1px solid #475569;
+  background: #ffffff;
+}
+
+.summary-block h3 {
+  margin: -14px -14px 13px;
+  padding: 9px;
+  background: #bae6fd;
+  text-align: center;
+  font-size: 14px;
+}
+
+.summary-block h3 small {
+  display: block;
+  margin-top: 3px;
+  color: #475569;
+  font-size: 8px;
+}
+
+.summary-block p {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 9px 0;
+}
+
+.summary-block span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.summary-block strong {
+  color: #0f172a;
+}
+
+.target-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background:
+    rgba(15, 23, 42, 0.58);
+}
+
+.target-payment-modal {
+  width: min(460px, 100%);
+  padding: 22px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow:
+    0 28px 70px
+    rgba(15, 23, 42, 0.28);
+}
+
+.target-modal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.target-modal-heading span {
+  color: #2563eb;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.target-modal-heading h2 {
+  margin: 5px 0 0;
+}
+
+.target-modal-heading p {
+  margin: 5px 0 0;
+  color: #64748b;
+}
+
+.target-modal-heading > button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: #f1f5f9;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.target-payment-balance {
+  margin: 18px 0;
+  padding: 15px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+}
+
+.target-payment-balance span,
+.target-payment-balance strong {
+  display: block;
+}
+
+.target-payment-balance span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.target-payment-balance strong {
+  margin-top: 5px;
+  color: #1d4ed8;
+  font-size: 23px;
+}
+
+.target-payment-modal > label {
+  display: block;
+  margin: 12px 0 7px;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.target-payment-modal > input,
+.target-payment-modal > select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.target-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ============================================================
+   MEMBER BILL
+============================================================ */
+
+.member-bill-filter-card {
+  grid-template-columns:
+    minmax(260px, 1.4fr)
+    minmax(190px, 1fr)
+    minmax(210px, 1fr)
+    minmax(250px, 1fr);
+}
+
+.target-empty-state {
+  padding: 70px 20px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #64748b;
+  text-align: center;
+}
+
+.target-member-banner {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  margin-bottom: 15px;
+}
+
+.target-member-banner > div {
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.target-member-banner span,
+.target-member-banner strong {
+  display: block;
+}
+
+.target-member-banner span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.target-member-banner strong {
+  margin-top: 6px;
+}
+
+.target-milk-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.target-milk-group {
+  overflow: hidden;
+  border: 1px solid #94a3b8;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.target-milk-group-title {
+  padding: 9px;
+  background: #e5e7eb;
+  text-align: center;
+}
+
+.target-milk-group-title h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.target-milk-group-title small {
+  margin-left: 7px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.target-two-session-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+}
+
+.target-session-table:first-child {
+  border-right: 1px solid #64748b;
+}
+
+.target-session-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #94a3b8;
+  background: #f8fafc;
+}
+
+.target-session-title h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.target-session-title span {
+  color: #2563eb;
+  font-weight: 900;
+}
+
+.target-session-scroll {
+  overflow-x: auto;
+}
+
+.target-session-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.target-session-table th,
+.target-session-table td {
+  padding: 8px 7px;
+  border: 1px solid #94a3b8;
+  text-align: center;
+  font-size: 9px;
+}
+
+.target-session-table th {
+  background: #f8fafc;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.target-session-table tfoot th {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.target-bill-bottom-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(5, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.target-info-panel {
+  min-height: 205px;
+  padding: 14px;
+  border: 1px solid #475569;
+  background: #ffffff;
+}
+
+.target-info-panel h3 {
+  margin: -14px -14px 13px;
+  padding: 9px;
+  background: #e2e8f0;
+  text-align: center;
+  font-size: 13px;
+}
+
+.target-info-panel h3 small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 8px;
+}
+
+.target-info-panel p {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.target-info-panel span {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.target-info-panel strong {
+  color: #0f172a;
+}
+
+.target-info-panel .deduction-value strong {
+  color: #dc2626;
+}
+
+.final-bill-panel {
+  background: #f8fafc;
+}
+
+.net-payable-amount {
+  color: #15803d !important;
+  font-size: 21px;
+}
+
+.target-bill-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@media (max-width: 1100px) {
+  .target-filter-card,
+  .member-bill-filter-card,
+  .target-member-banner {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .target-register-summary {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .target-bill-bottom-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .target-page-header {
+    flex-direction: column;
+  }
+
+  .target-filter-card,
+  .member-bill-filter-card,
+  .target-member-banner,
+  .target-register-summary,
+  .target-bill-bottom-grid,
+  .target-two-session-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .target-session-table:first-child {
+    border-right: none;
+    border-bottom: 1px solid #64748b;
+  }
+
+  .target-bill-actions {
+    flex-direction: column;
+  }
+}
