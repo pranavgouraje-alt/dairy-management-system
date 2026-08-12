@@ -1,4 +1,5 @@
 const { pool } = require("../config/db");
+const { postLedgerEntry, reverseReferenceEntries } = require("./ledgerService");
 
 function cleanText(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -145,49 +146,61 @@ async function createFeedRecord(data) {
     error.statusCode = 400;
     throw error;
   }
-
   if (quantity <= 0) {
     const error = new Error("Quantity must be greater than zero");
     error.statusCode = 400;
     throw error;
   }
-
   if (rate <= 0) {
     const error = new Error("Rate must be greater than zero");
     error.statusCode = 400;
     throw error;
   }
 
-  const [members] = await pool.execute(
-    `SELECT member_id FROM members WHERE member_id = ? LIMIT 1`,
-    [memberId]
-  );
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
 
-  if (!members.length) {
-    const error = new Error("Selected member does not exist");
-    error.statusCode = 400;
+    const [members] = await connection.execute(
+      `SELECT member_id FROM members WHERE member_id = ? LIMIT 1 FOR SHARE`,
+      [memberId]
+    );
+    if (!members.length) {
+      const error = new Error("Selected member does not exist");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const [result] = await connection.execute(
+      `
+        INSERT INTO feed_records (
+          member_id, member_name, feed_type, quantity, rate, amount,
+          remaining_amount, date, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [memberId, memberName, feedType, quantity, rate, amount, amount, date, status]
+    );
+
+    await postLedgerEntry(connection, {
+      memberId,
+      transactionDate: date,
+      transactionType: "FEED_ISSUED",
+      referenceType: "FEED",
+      referenceId: result.insertId,
+      description: `Feed issued: ${feedType}`,
+      debit: amount,
+      credit: 0,
+      createdBy: data.createdBy || "System",
+    });
+
+    await connection.commit();
+    return getFeedRecordById(result.insertId);
+  } catch (error) {
+    await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
   }
-
-  const [result] = await pool.execute(
-    `
-      INSERT INTO feed_records (
-        member_id,
-        member_name,
-        feed_type,
-        quantity,
-        rate,
-        amount,
-        remaining_amount,
-        date,
-        status
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [memberId, memberName, feedType, quantity, rate, amount, amount, date, status]
-  );
-
-  return getFeedRecordById(result.insertId);
 }
 
 async function updateFeedRecord(feedId, data) {
@@ -208,6 +221,17 @@ async function updateFeedRecord(feedId, data) {
     }
 
     const old = rows[0];
+
+    const [linked] = await connection.execute(
+      `SELECT COUNT(*) AS count FROM bill_deduction_allocations WHERE source_type = 'Feed' AND source_record_id = ?`,
+      [String(feedId)]
+    );
+    if (Number(linked[0].count) > 0) {
+      const error = new Error("Feed record cannot be edited after it has been linked to a bill deduction");
+      error.statusCode = 409;
+      throw error;
+    }
+
     const quantity = data.quantity !== undefined ? toNumber(data.quantity) : toNumber(old.quantity);
     const rate = data.rate !== undefined ? toNumber(data.rate) : toNumber(old.rate);
 
@@ -276,6 +300,19 @@ async function updateFeedRecord(feedId, data) {
       [memberId, memberName, feedType, quantity, rate, amount, remaining, date, finalStatus, feedId]
     );
 
+    await reverseReferenceEntries(connection, "FEED", feedId, "System");
+    await postLedgerEntry(connection, {
+      memberId,
+      transactionDate: date,
+      transactionType: "FEED_ISSUED",
+      referenceType: "FEED",
+      referenceId: feedId,
+      description: `Feed issued: ${feedType}`,
+      debit: amount,
+      credit: 0,
+      createdBy: "System",
+    });
+
     await connection.commit();
     return getFeedRecordById(feedId);
   } catch (error) {
@@ -309,6 +346,13 @@ async function deleteFeedRecord(feedId) {
       error.statusCode = 404;
       throw error;
     }
+
+    await reverseReferenceEntries(
+      connection,
+      "FEED",
+      feedId,
+      "System"
+    );
 
     await connection.execute(
       `DELETE FROM feed_records WHERE feed_id = ?`,

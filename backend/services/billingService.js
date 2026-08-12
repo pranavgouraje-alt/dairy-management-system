@@ -3,6 +3,11 @@ const {
 } = require("../config/db");
 
 const {
+  postLedgerEntry,
+  reverseReferenceEntries,
+} = require("./ledgerService");
+
+const {
   calculateMilkSummary,
   calculateBillTotals,
   getBillingPeriod,
@@ -836,6 +841,13 @@ async function saveCalculatedBill({
     billId =
       existingBill.bill_id;
 
+    await reverseReferenceEntries(
+      connection,
+      "BILL",
+      billId,
+      options.generatedBy || "System"
+    );
+
     billNumber =
       existingBill.bill_number;
 
@@ -1108,6 +1120,54 @@ async function saveCalculatedBill({
     options.memberId,
     calculated.calculation.advanceDeducted
   );
+
+  const ledgerDate = calculated.period.toDate;
+  const ledgerEntries = [
+    {
+      transactionType: "BILL_MILK_EARNING",
+      description: `Milk earnings for bill ${billNumber}`,
+      debit: 0,
+      credit: calculated.milkSummary.milkAmount,
+    },
+    {
+      transactionType: "BILL_FEED_DEDUCTION",
+      description: "Feed recovery through bill",
+      debit: calculated.calculation.feedDeducted,
+      credit: 0,
+    },
+    {
+      transactionType: "BILL_ADVANCE_DEDUCTION",
+      description: "Advance recovery through bill",
+      debit: calculated.calculation.advanceDeducted,
+      credit: 0,
+    },
+    {
+      transactionType: "BILL_RESERVE",
+      description: `${calculated.calculation.reservePercent}% reserve deduction`,
+      debit: calculated.calculation.reserveAmount,
+      credit: 0,
+    },
+    {
+      transactionType: "BILL_OTHER_DEDUCTION",
+      description: "Other bill deduction",
+      debit: calculated.calculation.otherDeduction,
+      credit: 0,
+    },
+  ];
+
+  for (const entry of ledgerEntries) {
+    await postLedgerEntry(connection, {
+      memberId: options.memberId,
+      transactionDate: ledgerDate,
+      transactionType: entry.transactionType,
+      referenceType: "BILL",
+      referenceId: billId,
+      description: entry.description,
+      debit: entry.debit,
+      credit: entry.credit,
+      createdBy: options.generatedBy || "System",
+    });
+  }
 
   return createFlatBillResult({
     billId,

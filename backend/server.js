@@ -11,54 +11,50 @@ const rateRoutes = require("./routes/rateRoutes");
 const feedRoutes = require("./routes/feedRoutes");
 const advanceRoutes = require("./routes/advanceRoutes");
 const billRoutes = require("./routes/billRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
-const billHistoryRoutes = require("./routes/billHistoryRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const billHistoryRoutes = require("./routes/billHistoryRoutes");
+const ledgerRoutes = require("./routes/ledgerRoutes");
 
 const { activityLogger } = require("./middleware/activityLogger");
 
 const app = express();
 
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true,
+  })
+);
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
 app.use(activityLogger);
 
 app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Dairy Management Backend is running",
-  });
+  res.status(200).send("Dairy Management Backend is running...");
 });
 
 app.get("/api/health/database", async (req, res) => {
   try {
     const { pool } = require("./config/db");
-    const [rows] = await pool.execute(
-      "SELECT NOW() AS serverTime, DATABASE() AS databaseName"
-    );
+    const [rows] = await pool.execute("SELECT NOW() AS serverTime");
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "MySQL database is connected",
-      data: rows[0],
+      data: { serverTime: rows[0].serverTime },
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Database health error:", error);
+    return res.status(500).json({
       success: false,
-      message: error.message || "MySQL database connection failed",
+      message: "MySQL database connection failed",
     });
   }
 });
 
-/* Every valid route must be before the /api 404 middleware. */
 app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/collections", collectionRoutes);
@@ -68,11 +64,13 @@ app.use("/api/advances", advanceRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/bill-history", billHistoryRoutes);
+app.use("/api/ledger", ledgerRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 
+/* API 404 handler MUST remain after every API route. */
 app.use("/api", (req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
     message: `API route not found: ${req.method} ${req.originalUrl}`,
   });
@@ -80,17 +78,9 @@ app.use("/api", (req, res) => {
 
 app.use((error, req, res, next) => {
   console.error("Unhandled server error:", error);
-
-  if (res.headersSent) {
-    return next(error);
-  }
-
-  res.status(error.statusCode || 500).json({
+  return res.status(error.statusCode || 500).json({
     success: false,
-    message:
-      error.sqlMessage ||
-      error.message ||
-      "Internal backend server error",
+    message: error.message || "Internal backend server error",
   });
 });
 
@@ -100,12 +90,16 @@ async function startServer() {
   const connected = await testDatabaseConnection();
 
   if (!connected) {
+    console.error("Server startup stopped because MySQL is unavailable.");
     process.exit(1);
   }
 
   app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
     console.log(`Backend URL: http://localhost:${PORT}`);
   });
 }
 
 startServer();
+
+module.exports = app;

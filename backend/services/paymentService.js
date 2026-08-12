@@ -1,5 +1,6 @@
 const { pool } = require("../config/db");
 const { generatePaymentNumber, roundAmount } = require("../utils/billCalculator");
+const { postLedgerEntry, reverseReferenceEntries } = require("./ledgerService");
 
 function cleanText(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -93,6 +94,23 @@ async function recordBillPayment({
        WHERE bill_id = ?`,
       [paidAmount, balanceAmount, status, billId]
     );
+
+    const [memberRows] = await connection.execute(
+      `SELECT member_id FROM bills WHERE bill_id = ? LIMIT 1`,
+      [billId]
+    );
+
+    await postLedgerEntry(connection, {
+      memberId: memberRows[0].member_id,
+      transactionDate: paymentDate || new Date().toISOString().slice(0, 10),
+      transactionType: "PAYMENT",
+      referenceType: "PAYMENT",
+      referenceId: result.insertId,
+      description: `Payment received for bill ${bill.bill_number}`,
+      debit: paymentAmount,
+      credit: 0,
+      createdBy: cleanText(receivedBy) || "System",
+    });
 
     await connection.commit();
 
@@ -284,6 +302,13 @@ async function deletePayment(paymentId) {
     }
 
     const bill = billRows[0];
+
+    await reverseReferenceEntries(
+      connection,
+      "PAYMENT",
+      paymentId,
+      "System"
+    );
 
     await connection.execute(
       `DELETE FROM bill_payments WHERE payment_id = ?`,

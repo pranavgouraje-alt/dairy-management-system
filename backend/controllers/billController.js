@@ -11,6 +11,10 @@ const {
 );
 
 const {
+  reverseReferenceEntries,
+} = require("../services/ledgerService");
+
+const {
   generateSingleMemberBill,
   generateAllMemberBills,
   restoreBillDeductionAllocations,
@@ -1644,6 +1648,15 @@ async function deleteBill(
     await restoreBillDeductionAllocations(
       connection,
       billId
+    );
+
+    // Preserve financial history by reversing the bill ledger entries
+    // before the bill is removed.
+    await reverseReferenceEntries(
+      connection,
+      "BILL",
+      billId,
+      req.user?.username || "System"
     );
 
     await connection.execute(
