@@ -148,6 +148,228 @@ async function getExistingBill(
   return rows[0] || null;
 }
 
+
+async function getPendingFeedDue(connection, memberId, billId = null, lockRows = false) {
+  const lockClause = lockRows ? " FOR UPDATE" : "";
+  let query = `
+    SELECT COALESCE(SUM(f.remaining_amount), 0) AS feed_due
+    FROM feed_records f
+    WHERE f.member_id = ?
+      AND f.remaining_amount > 0
+  `;
+  const values = [memberId];
+
+  // When previewing an already-generated bill, include the amount that
+  // was previously allocated to that bill so the preview represents the
+  // same financial position as the saved bill.
+  if (billId) {
+    query = `
+      SELECT COALESCE(
+        SUM(f.remaining_amount) + COALESCE((
+          SELECT SUM(a.deducted_amount)
+          FROM bill_deduction_allocations a
+          WHERE a.bill_id = ?
+            AND a.source_type = 'Feed'
+            AND a.source_record_id = CAST(f.feed_id AS CHAR)
+        ), 0),
+        0
+      ) AS feed_due
+      FROM feed_records f
+      WHERE f.member_id = ?
+    `;
+    values.unshift(billId);
+  }
+
+  const [rows] = await connection.execute(query + lockClause, values);
+  return roundAmount(rows[0]?.feed_due);
+}
+
+async function getPendingAdvanceDue(connection, memberId, billId = null, lockRows = false) {
+  const lockClause = lockRows ? " FOR UPDATE" : "";
+  let query = `
+    SELECT COALESCE(SUM(a.remaining_amount), 0) AS advance_due
+    FROM advances a
+    WHERE a.member_id = ?
+      AND a.remaining_amount > 0
+  `;
+  const values = [memberId];
+
+  if (billId) {
+    query = `
+      SELECT COALESCE(
+        SUM(a.remaining_amount) + COALESCE((
+          SELECT SUM(x.deducted_amount)
+          FROM bill_deduction_allocations x
+          WHERE x.bill_id = ?
+            AND x.source_type = 'Advance'
+            AND x.source_record_id = CAST(a.advance_id AS CHAR)
+        ), 0),
+        0
+      ) AS advance_due
+      FROM advances a
+      WHERE a.member_id = ?
+    `;
+    values.unshift(billId);
+  }
+
+  const [rows] = await connection.execute(query + lockClause, values);
+  return roundAmount(rows[0]?.advance_due);
+}
+
+async function restoreBillDeductionAllocations(connection, billId) {
+  const [allocations] = await connection.execute(
+    `
+      SELECT allocation_id, source_type, source_record_id, deducted_amount
+      FROM bill_deduction_allocations
+      WHERE bill_id = ?
+      ORDER BY allocation_id DESC
+      FOR UPDATE
+    `,
+    [billId]
+  );
+
+  for (const allocation of allocations) {
+    const table = allocation.source_type === "Feed" ? "feed_records" : "advances";
+    const idColumn = allocation.source_type === "Feed" ? "feed_id" : "advance_id";
+
+    await connection.execute(
+      `
+        UPDATE ${table}
+        SET
+          remaining_amount = LEAST(amount, remaining_amount + ?),
+          status = CASE
+            WHEN remaining_amount + ? >= amount THEN ${allocation.source_type === "Feed" ? "'Unpaid'" : "'Pending'"}
+            ELSE 'Partially Deducted'
+          END,
+          last_deducted_amount = 0,
+          last_deducted_date = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE ${idColumn} = ?
+      `,
+      [allocation.deducted_amount, allocation.deducted_amount, allocation.source_record_id]
+    );
+  }
+
+  await connection.execute(
+    `DELETE FROM bill_deduction_allocations WHERE bill_id = ?`,
+    [billId]
+  );
+}
+
+async function allocateFeedDeduction(connection, billId, memberId, amount) {
+  let remainingToAllocate = roundAmount(amount);
+  if (remainingToAllocate <= 0) return;
+
+  const [rows] = await connection.execute(
+    `
+      SELECT feed_id, amount, remaining_amount
+      FROM feed_records
+      WHERE member_id = ?
+        AND remaining_amount > 0
+      ORDER BY date ASC, feed_id ASC
+      FOR UPDATE
+    `,
+    [memberId]
+  );
+
+  for (const row of rows) {
+    if (remainingToAllocate <= 0) break;
+
+    const currentRemaining = roundAmount(row.remaining_amount);
+    const deducted = roundAmount(Math.min(currentRemaining, remainingToAllocate));
+    if (deducted <= 0) continue;
+
+    const newRemaining = roundAmount(currentRemaining - deducted);
+    const status = newRemaining === 0 ? "Deducted" : "Partially Deducted";
+
+    await connection.execute(
+      `
+        UPDATE feed_records
+        SET
+          remaining_amount = ?,
+          status = ?,
+          last_deducted_amount = ?,
+          last_deducted_date = CURRENT_DATE,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE feed_id = ?
+      `,
+      [newRemaining, status, deducted, row.feed_id]
+    );
+
+    await connection.execute(
+      `
+        INSERT INTO bill_deduction_allocations
+          (bill_id, source_type, source_record_id, due_amount, deducted_amount)
+        VALUES (?, 'Feed', ?, ?, ?)
+      `,
+      [billId, String(row.feed_id), currentRemaining, deducted]
+    );
+
+    remainingToAllocate = roundAmount(remainingToAllocate - deducted);
+  }
+
+  if (remainingToAllocate > 0.01) {
+    throw new Error("Unable to allocate the complete feed deduction");
+  }
+}
+
+async function allocateAdvanceDeduction(connection, billId, memberId, amount) {
+  let remainingToAllocate = roundAmount(amount);
+  if (remainingToAllocate <= 0) return;
+
+  const [rows] = await connection.execute(
+    `
+      SELECT advance_id, amount, remaining_amount
+      FROM advances
+      WHERE member_id = ?
+        AND remaining_amount > 0
+      ORDER BY date ASC, advance_id ASC
+      FOR UPDATE
+    `,
+    [memberId]
+  );
+
+  for (const row of rows) {
+    if (remainingToAllocate <= 0) break;
+
+    const currentRemaining = roundAmount(row.remaining_amount);
+    const deducted = roundAmount(Math.min(currentRemaining, remainingToAllocate));
+    if (deducted <= 0) continue;
+
+    const newRemaining = roundAmount(currentRemaining - deducted);
+    const status = newRemaining === 0 ? "Cleared" : "Partially Deducted";
+
+    await connection.execute(
+      `
+        UPDATE advances
+        SET
+          remaining_amount = ?,
+          status = ?,
+          last_deducted_amount = ?,
+          last_deducted_date = CURRENT_DATE,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE advance_id = ?
+      `,
+      [newRemaining, status, deducted, row.advance_id]
+    );
+
+    await connection.execute(
+      `
+        INSERT INTO bill_deduction_allocations
+          (bill_id, source_type, source_record_id, due_amount, deducted_amount)
+        VALUES (?, 'Advance', ?, ?, ?)
+      `,
+      [billId, String(row.advance_id), currentRemaining, deducted]
+    );
+
+    remainingToAllocate = roundAmount(remainingToAllocate - deducted);
+  }
+
+  if (remainingToAllocate > 0.01) {
+    throw new Error("Unable to allocate the complete advance deduction");
+  }
+}
+
 function mapCollection(collection) {
   return {
     collectionId:
@@ -330,13 +552,34 @@ async function calculateMemberBill({
       collections
     );
 
+  const existingBill = await getExistingBill(
+    connection,
+    memberId,
+    billMonth,
+    billCycle
+  );
+
+  const resolvedFeedDue = await getPendingFeedDue(
+    connection,
+    memberId,
+    existingBill?.bill_id || null,
+    lockRows
+  );
+
+  const resolvedAdvanceDue = await getPendingAdvanceDue(
+    connection,
+    memberId,
+    existingBill?.bill_id || null,
+    lockRows
+  );
+
   const calculation =
     calculateBillTotals({
       milkAmount:
         milkSummary.milkAmount,
 
-      feedDue,
-      advanceDue,
+      feedDue: resolvedFeedDue,
+      advanceDue: resolvedAdvanceDue,
       otherDeduction,
       reservePercent,
     });
@@ -852,6 +1095,20 @@ async function saveCalculatedBill({
     calculated.calculation
   );
 
+  await allocateFeedDeduction(
+    connection,
+    billId,
+    options.memberId,
+    calculated.calculation.feedDeducted
+  );
+
+  await allocateAdvanceDeduction(
+    connection,
+    billId,
+    options.memberId,
+    calculated.calculation.advanceDeducted
+  );
+
   return createFlatBillResult({
     billId,
     billNumber,
@@ -887,6 +1144,20 @@ async function generateSingleMemberBill(
 
   try {
     await connection.beginTransaction();
+
+    const existingBill = await getExistingBill(
+      connection,
+      options.memberId,
+      options.billMonth,
+      options.billCycle
+    );
+
+    if (existingBill) {
+      await restoreBillDeductionAllocations(
+        connection,
+        existingBill.bill_id
+      );
+    }
 
     const calculated =
       await calculateMemberBill({
@@ -1020,6 +1291,9 @@ module.exports = {
   getActiveMembers,
   getMemberCollections,
   getExistingBill,
+  getPendingFeedDue,
+  getPendingAdvanceDue,
+  restoreBillDeductionAllocations,
   calculateMemberBill,
   previewMemberBill,
   generateSingleMemberBill,

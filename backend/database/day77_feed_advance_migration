@@ -1,0 +1,114 @@
+USE dairy_management_system;
+
+
+
+CREATE TABLE IF NOT EXISTS feed_records (
+  feed_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  member_id VARCHAR(50) NOT NULL,
+  member_name VARCHAR(150) NOT NULL,
+  feed_type VARCHAR(100) NOT NULL,
+  quantity DECIMAL(12,2) NOT NULL,
+  rate DECIMAL(12,2) NOT NULL,
+  amount DECIMAL(14,2) NOT NULL,
+  remaining_amount DECIMAL(14,2) NOT NULL,
+  date DATE NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'Unpaid',
+  last_deducted_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  last_deducted_date DATE NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (feed_id),
+  INDEX idx_feed_member_date (member_id, date),
+  INDEX idx_feed_member_remaining (member_id, remaining_amount),
+  INDEX idx_feed_status (status),
+  CONSTRAINT fk_feed_member
+    FOREIGN KEY (member_id) REFERENCES members(member_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT chk_feed_quantity CHECK (quantity > 0),
+  CONSTRAINT chk_feed_rate CHECK (rate > 0),
+  CONSTRAINT chk_feed_amount CHECK (amount >= 0),
+  CONSTRAINT chk_feed_remaining CHECK (remaining_amount >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS advances (
+  advance_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  member_id VARCHAR(50) NOT NULL,
+  member_name VARCHAR(150) NOT NULL,
+  amount DECIMAL(14,2) NOT NULL,
+  remaining_amount DECIMAL(14,2) NOT NULL,
+  date DATE NOT NULL,
+  reason VARCHAR(500) NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+  last_deducted_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  last_deducted_date DATE NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (advance_id),
+  INDEX idx_advance_member_date (member_id, date),
+  INDEX idx_advance_member_remaining (member_id, remaining_amount),
+  INDEX idx_advance_status (status),
+  CONSTRAINT fk_advances_member
+    FOREIGN KEY (member_id) REFERENCES members(member_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT chk_advance_amount CHECK (amount > 0),
+  CONSTRAINT chk_advance_remaining CHECK (remaining_amount >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/*
+  One bill can recover money from multiple feed/advance records.
+  This allocation table makes regeneration safe: previous deductions
+  can be restored and recalculated without double deduction.
+*/
+CREATE TABLE IF NOT EXISTS bill_deduction_allocations (
+  allocation_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  bill_id BIGINT UNSIGNED NOT NULL,
+  source_type ENUM('Feed','Advance') NOT NULL,
+  source_record_id VARCHAR(100) NOT NULL,
+  due_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  deducted_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (allocation_id),
+  INDEX idx_alloc_bill (bill_id),
+  INDEX idx_alloc_source (source_type, source_record_id),
+  CONSTRAINT fk_alloc_bill
+    FOREIGN KEY (bill_id) REFERENCES bills(bill_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Add supporting indexes only when they do not already exist. */
+DROP PROCEDURE IF EXISTS add_day77_index_if_missing;
+DELIMITER $$
+CREATE PROCEDURE add_day77_index_if_missing(
+  IN table_name_value VARCHAR(64),
+  IN index_name_value VARCHAR(64),
+  IN columns_value VARCHAR(255)
+)
+BEGIN
+  DECLARE index_count INT DEFAULT 0;
+  SELECT COUNT(*) INTO index_count
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = table_name_value
+    AND INDEX_NAME = index_name_value;
+
+  IF index_count = 0 THEN
+    SET @sql_text = CONCAT(
+      'ALTER TABLE `', table_name_value, '` ADD INDEX `',
+      index_name_value, '` (', columns_value, ')'
+    );
+    PREPARE stmt FROM @sql_text;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+
+CALL add_day77_index_if_missing('feed_records', 'idx_feed_member_status', '`member_id`, `status`');
+CALL add_day77_index_if_missing('advances', 'idx_advance_member_status', '`member_id`, `status`');
+
+DROP PROCEDURE IF EXISTS add_day77_index_if_missing;
+
+SELECT 'Feed + Advance migration completed' AS message;
+SHOW TABLES LIKE 'feed_records';
+SHOW TABLES LIKE 'advances';
+SHOW TABLES LIKE 'bill_deduction_allocations';

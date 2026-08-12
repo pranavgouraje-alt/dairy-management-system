@@ -13,6 +13,7 @@ const {
 const {
   generateSingleMemberBill,
   generateAllMemberBills,
+  restoreBillDeductionAllocations,
 } = require(
   "../services/billingService"
 );
@@ -1601,91 +1602,78 @@ async function deleteBill(
   req,
   res
 ) {
+  const connection = await pool.getConnection();
+
   try {
-    const billId =
-      cleanText(req.params.id);
+    await connection.beginTransaction();
 
-    const [billRows] =
-      await pool.execute(
-        `
-          SELECT
-            bill_id,
-            bill_number,
-            paid_amount
-          FROM bills
-          WHERE bill_id = ?
-          LIMIT 1
-        `,
-        [billId]
-      );
+    const billId = cleanText(req.params.id);
 
-    if (
-      billRows.length === 0
-    ) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message:
-            "Bill not found",
-        });
-    }
-
-    if (
-      Number(
-        billRows[0].paid_amount
-      ) > 0
-    ) {
-      return res
-        .status(409)
-        .json({
-          success: false,
-
-          message:
-            "A bill with recorded payments cannot be deleted",
-        });
-    }
-
-    await pool.execute(
+    const [billRows] = await connection.execute(
       `
-        DELETE FROM bills
+        SELECT
+          bill_id,
+          bill_number,
+          paid_amount
+        FROM bills
         WHERE bill_id = ?
+        LIMIT 1
+        FOR UPDATE
       `,
       [billId]
     );
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-
-        message:
-          "Bill deleted successfully",
-
-        data: {
-          billId,
-
-          billNumber:
-            billRows[0]
-              .bill_number,
-        },
+    if (billRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Bill not found",
       });
-  } catch (error) {
-    console.error(
-      "Delete bill error:",
-      error
+    }
+
+    if (Number(billRows[0].paid_amount) > 0) {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        message: "A bill with recorded payments cannot be deleted",
+      });
+    }
+
+    // Return any Feed/Advance amounts allocated by this bill before the
+    // bill itself is deleted. The allocation rows then cascade away.
+    await restoreBillDeductionAllocations(
+      connection,
+      billId
     );
 
-    return res
-      .status(500)
-      .json({
-        success: false,
+    await connection.execute(
+      `DELETE FROM bills WHERE bill_id = ?`,
+      [billId]
+    );
 
-        message:
-          error.sqlMessage ||
-          error.message ||
-          "Unable to delete bill",
-      });
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Bill deleted successfully",
+      data: {
+        billId,
+        billNumber: billRows[0].bill_number,
+      },
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error("Delete bill error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.sqlMessage ||
+        error.message ||
+        "Unable to delete bill",
+    });
+  } finally {
+    connection.release();
   }
 }
 
